@@ -116,7 +116,7 @@ function assign(seat: Seat, agent: Agent, previousName?: string): Seat {
     ...seat,
     name:
       !seat.name ||
-      /^(?:expert|专家)\s*\d+$/i.test(seat.name) ||
+      /^(?:expert|专家|專家|専門家|전문가)\s*\d+$/i.test(seat.name) ||
       seat.name === previousName
         ? agent.label
         : seat.name,
@@ -337,11 +337,11 @@ export function RosterFields({
   const [agents, setAgents] = useState<Agent[]>([]),
     [revision, refresh] = useState(0),
     [loading, setLoading] = useState(true),
-    [error, setError] = useState("");
+    [error, setError] = useState<string | null>(null);
   useEffect(() => {
     const abort = new AbortController();
     setLoading(true);
-    setError("");
+    setError(null);
     rpc
       .call<{ agents: Agent[] }>(
         "codexhost/agents",
@@ -353,11 +353,7 @@ export function RosterFields({
       })
       .catch((e) => {
         if (!abort.signal.aborted)
-          setError(
-            typeof e?.message === "string"
-              ? e.message
-              : "Agent directory unavailable",
-          );
+          setError(typeof e?.message === "string" ? e.message : "");
       })
       .finally(() => {
         if (!abort.signal.aborted) setLoading(false);
@@ -392,7 +388,11 @@ export function RosterFields({
             {l("Reading host agents…", "正在读取宿主 Agent…")}
           </p>
         )}
-        {error && <p role="alert">{error}</p>}
+        {error !== null && (
+          <p role="alert">
+            {error || l("Agent directory unavailable", "专家目录不可用")}
+          </p>
+        )}
         <div className="tools">
           <button
             type="button"

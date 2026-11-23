@@ -1,5 +1,5 @@
 import { installCouncilCommand } from "./composer-command";
-import { mountWorkspace } from "./page";
+import { listenAppearance, mountWorkspace, resolveLocale, translate } from "./page";
 import type { HostApi } from "../frontend/host";
 type Panel = {
   id: string;
@@ -38,6 +38,8 @@ export async function activate(
     },
   });
   let closeCommand: (() => void) | undefined;
+  let hostLocale = api.locale || "en",
+    preference: unknown = "auto";
   const offCommand =
     api.dom &&
     installCouncilCommand(
@@ -58,19 +60,43 @@ export async function activate(
         closeCommand = close;
       },
       () =>
-        (
-          api.locale ||
-          document.documentElement.lang ||
-          navigator.language
-        ).startsWith("zh")
-          ? "发起会议"
-          : "Start a council",
+        translate(
+          resolveLocale(hostLocale, preference),
+          "Start a council",
+          "发起会议",
+        ),
     );
-  let disposed = false;
+  const offAppearance =
+    offCommand &&
+    listenAppearance(api, document, (lang) => {
+      hostLocale = lang;
+      offCommand.refreshLabel();
+    });
+  let disposed = false,
+    settingsChanged = false;
+  function applySettings(s: Record<string, unknown>) {
+    preference = s.language;
+    offCommand?.refreshLabel();
+  }
+  const offSettings =
+    offCommand &&
+    api.storage.onChange((s) => {
+      settingsChanged = true;
+      applySettings(s);
+    });
+  if (offCommand)
+    void api.storage
+      .get()
+      .then((s) => {
+        if (!settingsChanged && !disposed) applySettings(s);
+      })
+      .catch(() => {});
   function dispose() {
     if (disposed) return;
     disposed = true;
     for (const close of active) close();
+    offAppearance?.();
+    offSettings?.();
     offCommand?.();
     closeCommand?.();
     unregister();

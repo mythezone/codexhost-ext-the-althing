@@ -113,6 +113,31 @@ test("Desktop classic entry coexists with thread tree, tracks geometry, yields t
     document.body.append(composer);
     const prompt = composer.querySelector("textarea")!;
     prompt.value = "/althing Desktop meeting";
+    fireEvent.input(prompt);
+    const hint = () =>
+      composer.querySelector("[data-althing-command]")?.textContent;
+    for (const [language, title, command] of [
+      ["zh-CN", "议事厅", "发起会议"],
+      ["zh-HK", "議事廳", "發起會議"],
+      ["ja-JP", "評議会", "会議を開く"],
+      ["ko-KR", "의회", "회의 시작"],
+      ["en", "The Althing", "Start a council"],
+    ]) {
+      for (const cb of h.languages) cb(language);
+      await eventually(
+        () =>
+          owned("top")?.textContent?.startsWith(title) &&
+          hint()?.endsWith(command),
+      );
+    }
+    for (const cb of h.listeners) cb({ language: "ja" });
+    await eventually(
+      () =>
+        hint()?.endsWith("会議を開く") &&
+        owned("group-header")?.textContent?.includes("評議会"),
+    );
+    for (const cb of h.listeners) cb({ language: "auto" });
+    await eventually(() => hint()?.endsWith("Start a council"));
     fireEvent.keyDown(prompt, { key: "Enter" });
     const commandOverlay = await eventually(() => owned("overlay"));
     await eventually(

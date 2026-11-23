@@ -1,7 +1,10 @@
 import type { ComponentType } from "react";
 import type { Topic, Contribution, Report } from "../types";
 
-type Extension = { id: string; label: string };
+type Extension = {
+  id: string;
+  label: (l: (en: string, zh: string) => string) => string;
+};
 export type TopicTab = Extension & {
   component: ComponentType<{ topic: Topic; configure:()=>void }>;
 };

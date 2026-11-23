@@ -64,7 +64,7 @@ export function Roster({ people }: { people: Expert[] }) {
 }
 plugins.register("tabs", {
   id: "roster",
-  label: "专家名册",
+  label: (l) => l("Expert roster", "专家名册"),
   component: ({ topic, configure }) => {
     const l = useL(),
       host = hostRoster(topic);
@@ -103,7 +103,7 @@ plugins.register("tabs", {
 });
 plugins.register("contributions", {
   id: "verification",
-  label: "验证意见",
+  label: (l) => l("Verification", "验证意见"),
   matches: (c) => c.kind === "verification",
   component: ({ contribution }) => (
     <>
@@ -117,7 +117,7 @@ plugins.register("contributions", {
 });
 plugins.register("actions", {
   id: "print",
-  label: "打印",
+  label: (l) => l("Print", "打印"),
   component: ({ onPrint }) => (
     <button
       className="icon"
@@ -132,6 +132,6 @@ plugins.register("actions", {
 });
 plugins.register("widgets", {
   id: "version",
-  label: "报告版本",
+  label: (l) => l("Report version", "报告版本"),
   component: ({ report }) => <span className="tag">v{report.version}</span>,
 });

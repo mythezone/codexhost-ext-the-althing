@@ -120,6 +120,7 @@ export function validateDependencies(t: StoredTopic) {
     throw Error("Sub-agenda dependencies contain a cycle");
 }
 export class Council {
+  reportLocale = "en";
   tree!: StoredTopic;
   readonly events: { type: string; resource_id: string }[] = [];
   readonly insertedIds: string[] = [];
@@ -275,7 +276,7 @@ export class Council {
       r.report_type ??= r.agenda_id ? "agenda" : "final";
       r.format = r.html_content ? "html" : "markdown";
       if (r.html_content) r.source_html = r.html_content;
-      r.html_content = renderReport(r, this.tree.title);
+      r.html_content = renderReport(r, this.tree.title,this.reportLocale);
       if (r.set_as_primary && r.report_type !== "custom") {
         const owner = r.agenda_id ? this.get("agenda", r.agenda_id) : this.tree;
         if ("report_id" in owner) owner.report_id = r.id;

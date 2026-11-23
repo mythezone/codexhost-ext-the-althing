@@ -608,3 +608,29 @@ test("plan reads a complete JSON object between commentary, respecting quoted br
   assert.match(failed.error!, /agendas\[1\].title/);
   assert.deepEqual((await store.load("study")).agendas, before);
 });
+
+test("published agenda conclusions use English headings by default and the requested locale", async (t) => {
+  const { o, store, finishRun } = await setup(t);
+  t.after(() => o.dispose());
+  for (const [locale, headings] of [
+    [undefined, ["Summary", "Key Findings", "Open Disagreements"]],
+    ["ko", ["요약", "핵심 결론", "미해결 쟁점"]],
+  ] as const) {
+    const run = await o.moderate("agenda_conclusion", "study", {
+      agendaId: "a",
+      publishReport: true,
+      locale,
+    });
+    const done = await finishRun(
+      run.id,
+      JSON.stringify({ conclusion_summary: "Extend the trial by one week." }),
+    );
+    assert.equal(done.status, "completed", done.error);
+    const report = await store.report("study", done.reportId!);
+    for (const heading of headings)
+      assert.ok(report.markdown_content?.includes("## " + heading), heading);
+    assert.ok(
+      report.html_content?.includes('<html lang="' + (locale || "en") + '">'),
+    );
+  }
+});

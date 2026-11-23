@@ -29,8 +29,8 @@ async function openWebPanel(page: Page) {
       <header>Host</header><main></main><script type="module">
       import {activate} from '/web/index.mjs';
       const signal = new AbortController().signal;
-      await activate({signal,locale:'en',assets:{url:p=>'/'+p},backend:{invoke:window.invoke},
-        storage:{get:async()=>({}),onChange:()=>()=>{}},track(){},
+      await activate({signal,onLocaleChange(fn){const cb=e=>fn(e.detail);document.addEventListener('host-locale',cb);return ()=>document.removeEventListener('host-locale',cb)},assets:{url:p=>'/'+p},backend:{invoke:window.invoke},
+        storage:{get:async()=>({}),onChange(fn){const cb=e=>fn(e.detail);document.addEventListener('plugin-settings',cb);return ()=>document.removeEventListener('plugin-settings',cb)}},track(){},
         dom:{mount(parent){const container=document.createElement('div');parent.append(container);return {container,dispose:()=>container.remove()}}},
         panels:{register(panel){panel.render(document.querySelector('main'),signal);return ()=>{}}}});
       </script>`,
@@ -690,6 +690,88 @@ for (const engine of [chromium, webkit]) {
         await workspace.getByRole("button", { name: "Back to chat" }).tap();
         await workspace.waitFor({ state: "detached" });
       }
+    },
+  );
+}
+
+for (const engine of [chromium, webkit]) {
+  test(
+    engine.name() +
+      " switches language in an open workspace and composer with a Chinese browser",
+    async (t) => {
+      const browser = await engine.launch();
+      t.after(() => browser.close());
+      const page = await browser.newPage({
+        locale: "zh-CN",
+        viewport: { width: 375, height: 812 },
+        isMobile: true,
+        hasTouch: true,
+      });
+      const { api } = mockUI();
+      await page.exposeFunction("invoke", (method: string, p: object) =>
+        api.backend.invoke(method, p),
+      );
+      await openWebPanel(page);
+      const root = page.locator(".althing-ext-root");
+      await root.getByRole("button", { name: "New Council" }).waitFor();
+      assert.equal(await root.getAttribute("lang"), "en");
+      await page.evaluate(() => {
+        const composer = document.createElement("form");
+        composer.setAttribute("data-composer-card", "");
+        composer.innerHTML =
+          '<textarea></textarea><button aria-label="보내기"></button>';
+        document.body.prepend(composer);
+        const input = composer.querySelector("textarea")!;
+        input.value = "/althing";
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        document.documentElement.lang = "zh-Hant-HK";
+      });
+      await root.getByRole("button", { name: "新建議題" }).waitFor();
+      const cases = [
+        ["en", "New Council", "Start a council"],
+        ["zh-CN", "新建议题", "发起会议"],
+        ["zh-TW", "新建議題", "發起會議"],
+        ["ja", "新しい会議", "会議を開く"],
+        ["ko", "새 회의", "회의 시작"],
+      ];
+      for (const [tag, name, hint] of cases) {
+        await page.evaluate(
+          (tag) =>
+            document.dispatchEvent(
+              new CustomEvent("host-locale", { detail: tag }),
+            ),
+          tag,
+        );
+        await root.getByRole("button", { name, exact: true }).waitFor();
+        await page
+          .getByRole("button", { name: "/althing · " + hint })
+          .waitFor();
+        assert.equal(await root.getAttribute("lang"), tag);
+        assert.ok(
+          await root.evaluate((e) => e.scrollWidth <= e.clientWidth + 1),
+        );
+      }
+      await page.evaluate(() =>
+        document.dispatchEvent(
+          new CustomEvent("plugin-settings", { detail: { language: "en" } }),
+        ),
+      );
+      await root.getByRole("button", { name: "New Council" }).waitFor();
+      await page.evaluate(() =>
+        document.dispatchEvent(
+          new CustomEvent("plugin-settings", { detail: { language: "auto" } }),
+        ),
+      );
+      await root.getByRole("button", { name: "새 회의" }).waitFor();
+      await page
+        .locator("[data-composer-card] button[aria-label]")
+        .dispatchEvent("click");
+      await page
+        .locator("[data-althing-web-workspace]")
+        .getByRole("dialog")
+        .waitFor();
+      assert.equal(await page.locator("[data-althing-web-workspace] .althing-ext-root").getAttribute("lang"),"ko");
+
     },
   );
 }

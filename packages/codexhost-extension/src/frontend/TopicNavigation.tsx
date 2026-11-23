@@ -212,7 +212,7 @@ export default function TopicNavigation({
           {plugins.tabs.map((p) =>
             link(
               "plugin:" + p.id,
-              l("Expert roster", p.label),
+              p.label(l),
               <UsersRound size={19} />,
             ),
           )}

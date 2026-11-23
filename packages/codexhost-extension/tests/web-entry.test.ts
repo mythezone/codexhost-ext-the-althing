@@ -54,7 +54,10 @@ test("native Web tracks document language and system appearance without page-onl
   const host = mockUI(),
     { locale, colorScheme, onLocaleChange, onColorSchemeChange, ...native } =
       host.api;
-  document.documentElement.lang = "zh-CN";
+  Object.defineProperty(navigator, "language", {
+    configurable: true,
+    value: "zh-CN",
+  });
   document.documentElement.classList.add("dark");
   let panel: any;
   const web = await import(
@@ -74,6 +77,10 @@ test("native Web tracks document language and system appearance without page-onl
   document.body.append(root);
   panel.render(root, native.signal);
   try {
+    await eventually(() =>
+      query(root).getByRole("button", { name: "New Council" }),
+    );
+    document.documentElement.lang = "zh-CN";
     await eventually(() =>
       query(root).getByRole("button", { name: "新建议题" }),
     );
@@ -150,7 +157,27 @@ test("chat command selects a moderator, plans a topic via the backend, and waits
     assert.equal(enter({ isComposing: true }), true);
     assert.equal(mounted(), null);
     fireEvent.input(input);
-    assert.ok(shell.querySelector("[data-althing-command]"));
+    const hint = () =>
+      shell.querySelector("[data-althing-command]")?.textContent;
+    document.documentElement.lang = "zh-HK";
+    await eventually(() => hint()?.endsWith("Start a council"));
+    for (const [language, translation] of [
+      ["zh-CN", "发起会议"],
+      ["zh-TW", "發起會議"],
+      ["ja", "会議を開く"],
+      ["ko", "회의 시작"],
+      ["en", "Start a council"],
+    ]) {
+      for (const change of h.languages) change(language);
+      await eventually(() => hint()?.endsWith(translation));
+    }
+    for (const change of h.listeners) change({ language: "ja" });
+    await eventually(() => hint()?.endsWith("会議を開く"));
+    for (const change of h.listeners) change({ language: "auto" });
+    await eventually(() => hint()?.endsWith("Start a council"));
+    shell
+      .querySelector("button[aria-label]")!
+      .setAttribute("aria-label", "送信");
     assert.equal(
       fireEvent.click(shell.querySelector("button[aria-label]")!),
       false,

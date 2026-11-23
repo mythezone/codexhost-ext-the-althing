@@ -44,6 +44,8 @@ export type Surface = {
   openThread?: (id: string) => Promise<void>;
   close?: () => void;
 };
+// Some Host APIs expose the activation-time locale and deliver later choices through events.
+const reportedLocale = new WeakMap<HostApi, string>();
 export function listenAppearance(
   api: HostApi,
   doc: Document,
@@ -51,7 +53,7 @@ export function listenAppearance(
 ) {
   const html = doc.documentElement,
     media = doc.defaultView?.matchMedia?.("(prefers-color-scheme: dark)");
-  let locale = api.locale,
+  let locale = reportedLocale.get(api) ?? api.locale,
     scheme = api.colorScheme;
   const apply = () => {
     const cssScheme = doc.defaultView?.getComputedStyle(doc.body).colorScheme;
@@ -64,10 +66,7 @@ export function listenAppearance(
           : media?.matches
             ? "dark"
             : "light";
-    update(
-      locale || html.lang || doc.defaultView?.navigator.language || "en",
-      scheme || native,
-    );
+    update(locale || html.lang || "en", scheme || native);
   };
   const obs = new MutationObserver(apply);
   obs.observe(html, {
@@ -76,6 +75,7 @@ export function listenAppearance(
   });
   media?.addEventListener("change", apply);
   const offLocale = api.onLocaleChange?.((s) => {
+      reportedLocale.set(api, s);
       locale = s;
       apply();
     }),

@@ -1,80 +1,91 @@
-# The Althing · 议事厅
+<p align="center"><img src="assets/icon.png" alt="The Althing" width="84"></p>
 
-**The Althing（议事厅）**以古希腊神话中的奥林匹斯诸神议事厅为意象：各有所长的模型化身议事席位，围绕同一议题围坐辩论、彼此质询，由主持模型汇总共识、分歧与依据并沉淀为清晰报告。
+<h1 align="center">The Althing</h1>
 
-![议事厅封面，取自插件的议题广场](assets/art/council.webp)
+<p align="center"><strong>A council on Olympus, convened in your CodexHost workspace.</strong><br>Give each model a seat and a question to investigate. Let the experts challenge one another, then ask the chair to record what they agree on and what remains open.</p>
 
-## 安装
+<p align="center">⭐ If The Althing is useful to you, please give it a star! ⭐</p>
 
-1. 打开 CodexHost 的插件中心。Desktop 从**设置 → 插件**进入，Web 从**插件 → 插件中心**进入。
-2. 在市场中找到 **The Althing / 议事厅**（扩展 ID 为 `the-althing`），安装并启用。
+<p align="center"><a href="https://github.com/mythezone/codexhost-ext-the-althing/releases/latest"><img src="https://img.shields.io/github/v/release/mythezone/codexhost-ext-the-althing?style=flat-square&amp;label=Release" alt="Latest Release"></a> <a href="../../LICENSE"><img src="https://img.shields.io/badge/License-MIT-407249?style=flat-square" alt="License MIT"></a> <a href="https://github.com/BytePioneer-AI/codexhost-extensions-registry"><img src="https://img.shields.io/badge/CodexHost-Extension%20v2-5268a1?style=flat-square" alt="CodexHost Extension v2"></a> <img src="https://img.shields.io/badge/Platforms-Desktop%20%7C%20Web%20%7C%20Mobile-4b6277?style=flat-square" alt="Platforms Desktop | Web | Mobile"> <img src="https://img.shields.io/badge/Languages-EN%20%7C%20%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87%20%7C%20%E7%B9%81%E9%AB%94%E4%B8%AD%E6%96%87%20%7C%20%E6%97%A5%E6%9C%AC%E8%AA%9E%20%7C%20%ED%95%9C%EA%B5%AD%EC%96%B4-4b6277?style=flat-square" alt="Languages EN | 简体中文 | 繁體中文 | 日本語 | 한국어"></p>
 
-需要手动安装时，从最新 Release 下载 **`the-althing.zip`**，在插件中心导入 ZIP 并启用。[下载最新版本](https://github.com/mythezone/codexhost-ext-the-althing/releases/latest)
+<p align="center"><img src="https://img.shields.io/badge/Codex-183830?style=for-the-badge" alt="Codex"> <img src="https://img.shields.io/badge/Claude%20Code-a54c33?style=for-the-badge" alt="Claude Code"> <img src="https://img.shields.io/badge/Antigravity-4b548b?style=for-the-badge" alt="Antigravity"> <img src="https://img.shields.io/badge/Grok-20242c?style=for-the-badge" alt="Grok"> <img src="https://img.shields.io/badge/CodeBuddy-246066?style=for-the-badge" alt="CodeBuddy"> <img src="https://img.shields.io/badge/Cursor%20CLI-4e5267?style=for-the-badge" alt="Cursor CLI"> <img src="https://img.shields.io/badge/%2B%20More%20Host%20Agents-495768?style=for-the-badge" alt="+ More Host Agents"></p>
 
-## 发起第一场会议
+<p align="center"><a href="#install">Install</a> · <a href="#quick-start">Quick Start</a> · <a href="#features">Features</a> · <a href="#screenshots">Screenshots</a> · <a href="#development">Development</a> · <a href="https://github.com/mythezone/codexhost-ext-the-althing/releases">Releases</a> · <a href="https://github.com/mythezone/codexhost-ext-the-althing/issues">Issues</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a></p>
 
-在 Desktop 或 Web 的聊天框输入下面这行并按回车，也可以点击输入框旁的**发起会议**。单独输入 `/althing` 可在向导中填写主题。
+<p align="center"><img src="assets/art/council.webp" alt="The Althing" width="720"></p>
+
+<a id="install"></a>
+
+## Installation
+
+Open **Settings → Plugins** on Desktop or **Plugins → Plugin Center** on Web. Find **The Althing** (`the-althing`) in the marketplace, install it and enable it.
+
+For a manual install, download **`the-althing.zip`** from the latest stable release, import the ZIP in the plugin center and enable it. To follow stable updates from GitHub, select `mythezone/codexhost-ext-the-althing`, choose the asset `the-althing.zip` and leave the tag empty.
+
+[Releases](https://github.com/mythezone/codexhost-ext-the-althing/releases/latest) · [CodexHost Extensions Registry](https://github.com/BytePioneer-AI/codexhost-extensions-registry)
+
+<a id="quick-start"></a>
+
+## Quick Start
 
 ```text
-/althing 如何把新用户的首次配置缩短到五分钟？
+/althing Which transit corridor should we pilot after the last bus?
 ```
 
-1. **选工作区和专家。** 比如邀请两位专家，分别从用户体验和工程实现的角度分析。向导会列出 CodexHost 已就绪的 Agent 及默认模型和推理强度。点「一键加入协作专家」可沿用宿主的协作配置，也可以逐席选择 Agent、模型、推理强度和会议角色，或填写自定义角色。通过聊天命令建会时，默认由第一位专家兼任主持，也可以另选主持模型。
-2. **请主持人拟议程。** 在向导里写下关心的问题，例如「哪一步最容易放弃？怎样衡量改动是否有效？」。选择**创建并规划议程**，等待主持模型列出议程和子议程，再审阅或补充。也可以手动填写议程。
-3. **派发、综述、出报告。** 打开一个子议程，点**派发讨论**并选定本轮专家。发言结束后可针对某条发言发起质询，或点**主持人综述**。最后在议程页选**生成议程结论与报告**，或在议题操作中选**生成总报告**。
+1. Enter the command in a Desktop or Web chat and press Enter, or choose **Start a council**. A bare `/althing` opens the same wizard with an empty title.
+2. Choose the workspace and number of experts. **Add collaboration experts** uses the ready agents and their defaults from CodexHost. For each seat, choose its agent, model, thinking level and role. The first expert can chair the meeting, or you can select another moderator.
+3. Use **Create and plan agenda** to have the chair propose sub-agendas. Review the plan, open a sub-agenda and select **Dispatch round** when you are ready for the experts to speak.
+4. Read the opening statements, request a critique, then select **Synthesize**. Publish an agenda report or a final report. In an unarchived council, **Expert roster → Configure roles & agents** changes assignments for subsequent rounds.
 
-## 已支持的功能
+<a id="features"></a>
 
-| 功能 | 可以做什么 |
+## Features
+
+| Feature | What you can do |
 | --- | --- |
-| 聊天命令 `/althing` | 输入命令打开会议向导，也可用 `/althing 会议主题` 预填标题。 |
-| 专家与主持人 | 在向导或未归档议题的「专家名册 → 配置专家与角色」里更换专家和主持人的 Agent、模型、推理强度与分工。已参与讨论的席位保留历史记录。主持模型可规划议程、综合发言并撰写报告。 |
-| 讨论协议 | 选择标准议会、对抗辩论或快速评议。子议程可并行或顺序发言，质询和反驳可指定要回应的发言。 |
-| 进度与子会话 | 查看各席位的任务状态、进度和发言原文，打开对应子会话，取消进行中的任务或重试失败任务。 |
-| 报告与归档 | 阅读或打印议程报告和总报告，导出独立 HTML 或 Markdown 包，用 ZIP 归档、迁移和恢复整场会议。 |
-| 项目与侧栏 | 按项目、状态或关键词查找议题。Desktop 只在有议题的项目下显示议事厅，顶部入口默认在议题进行时显示，可在插件设置中调整。 |
+| `/althing` | Open the meeting wizard from chat, optionally with a topic already filled in. |
+| Multi-agent collaboration & role assignment | See which host agents are ready. Use the host defaults or choose each expert’s and moderator’s model, reasoning level and role. |
+| Discussion protocols | Run a standard council, adversarial debate or rapid panel. Dispatch in parallel or in sequence and target a particular contribution for rebuttal. |
+| Progress & delegated threads | Follow each seat’s progress, inspect the delegated thread, cancel a running task or retry a failed one. |
+| Reports & portable ZIP archives | Read and print reports, download HTML or Markdown, and move the whole council to another host in a ZIP. |
+| Desktop, Web & Mobile | Find councils under their Desktop projects or open the Web panel. Narrow screens show conclusion cards and horizontally scrollable tables. |
+| Interface languages | English, Simplified Chinese, Traditional Chinese, Japanese and Korean. The default follows CodexHost and falls back to English. Override it under **Interface language** in plugin settings. |
 
-## 未来设想
+<a id="screenshots"></a>
 
-以下是可探索的方向，尚未排期。
+## Screenshots
 
-- **跨机器参会。** 让不同 CodexHost 实例上的专家加入同一场会议，各自在自己的机器上完成发言。
-- **邀请与预约。** 发起人提前发送议程和参会时间，受邀者确认参加，并选择愿意提供的模型。
-- **会议用量回顾。** 会后按议程和专家查看耗时、轮次与模型提供的用量记录，作为下次选择专家阵容的参考。
+![Council hub — filter active and archived meetings by project.](assets/screenshots/hub.webp)
 
-## English quick start
+Council hub — filter active and archived meetings by project.
 
-Install and enable **The Althing** from the CodexHost plugin marketplace. In a Desktop or Web chat, enter `/althing How can we simplify onboarding?`. Choose a workspace, experts and moderator, then select **Create and plan agenda**. Review the proposed sub-agendas and select **Dispatch round** when you are ready for the experts to speak. Use **Configure roles & agents** in the expert roster to change assignments for later rounds. You can then request a synthesis, publish the final report, or export the council as a ZIP.
+![Overview — read the chair’s conclusions and unresolved questions.](assets/screenshots/overview.webp)
 
-## 界面预览
+Overview — read the chair’s conclusions and unresolved questions.
 
-### 议题广场
+![Discussion — follow each round and expand individual contributions.](assets/screenshots/discussion.webp)
 
-按项目筛选会议，查看哪些议题仍在讨论，哪些已有报告。
+Discussion — follow each round and expand individual contributions.
 
-![议题广场中的项目筛选、状态筛选和议题卡片](assets/screenshots/hub.webp)
+![Report reader — review a publication, inspect a table or print to PDF.](assets/screenshots/report-reader.webp)
 
-### 议题总览
+Report reader — review a publication, inspect a table or print to PDF.
 
-从同一页查看各项议程的结论、要点和未决分歧。
+<a id="roadmap"></a>
 
-![议题总览中的摘要、关键结论和议程结论矩阵](assets/screenshots/overview.webp)
+## Roadmap
 
-### 子议程讨论
+Ideas under consideration, without a release schedule.
 
-沿着一轮任务查看各位专家的回应，展开原文可以读到完整论证。
+- Invite experts running on different hosts into the same council.
+- Send an agenda in advance and let participants confirm their seats.
+- Review time and model-reported usage by expert and agenda.
 
-![子议程讨论中的派发任务、专家署名和发言摘要](assets/screenshots/discussion.webp)
+<a id="development"></a>
 
-### 报告阅读器
+## Development & Architecture
 
-在议题内打开报告，阅读正文和表格，也可以打印或下载 HTML。
-
-![报告阅读器中的章节标题、正文和表格](assets/screenshots/report-reader.webp)
-
-## Build and verify
-
-Run from this package with Node 22.12 or later and npm.
+The React workspace runs in Desktop and Web. An ESM backend stores councils locally and delegates work through CodexHost. Develop with Node.js 22.12+ and npm.
 
 ```sh
 npm ci
@@ -85,28 +96,33 @@ npm run validate:registry
 npm test
 ```
 
-To run the mobile touch regression, run `npx playwright-core install chromium webkit` once, then `npm run test:mobile`. It opens the built Web panel in Chromium and WebKit and checks scrolling, narrow-screen controls, rotation, conclusion cards, scrollable report tables, and the council wizard inside a height-constrained host.
+Install Chromium and WebKit once for the touch and narrow-screen regressions.
 
-The build writes a self-contained extension to `dist/`. For backend-only development, `npm run build:backend` rebuilds `dist/backend/index.mjs`. The page bundles React and the council app. Web registers a main-workspace panel that imports the page bundle. Desktop registers a classic script and mounts the app in a private shadow root. On phones, agenda conclusions appear as cards. Swipe wide tables inside discussions, the roster, and reports. Opening or downloading an older report adapts its layout while preserving its stored content and print script. All three surfaces share the same data directory and RPC contracts.
+```sh
+npx playwright-core install chromium webkit
+npm run test:mobile
+```
 
-## Local installation
+For local installation, import the built `dist/` directory (the one containing `manifest.json`) in the plugin center and enable it. Release files are written to `dist-release/`.
 
-Open the CodexHost plugin center, import a local directory using `localDir`, select this package’s absolute `dist/` path (the directory containing `manifest.json`), and enable **The Althing / 议事厅**. Rebuild and update the local installation after changing code.
+<a id="backend-contract"></a>
 
-The wizard combines configured projects, the default workspace and recent thread directories. The Desktop sidebar can supply additional project paths. Choose a local absolute workspace for delegation. Harness, model and thinking options come from the Host. Theme and sidebar settings are available in the plugin center.
+### Backend contract
 
-For release-based updates, use the GitHub source `mythezone/codexhost-ext-the-althing` with release asset `the-althing.zip`. Leave the tag empty to follow the latest stable release. A plugin originally installed by uploading a ZIP needs an explicit source on its first update. Updating the existing extension ID preserves its council data.
+Every method uses the `althing/` prefix. Resource fields use snake_case, while RPC parameters use names such as `topicId`. The built-in client handles operation receipts and chunk transfers.
 
-## Package and submit
+| RPC family | Contract |
+| --- | --- |
+| `capabilities, codexhost/*` | Discover methods and host workspaces. `agents({ cwd?, refresh? })` returns readiness, collaboration defaults and model-specific thinking options. |
+| `topics/*` | Create, list, read, update or delete topics. `get({ topicId, summaryOnly: true })` omits long text. `body({ topicId, kind, resourceId })` fetches a contribution or dispatch body. |
+| `agendas/*, sub-agendas/*, dispatches/*, contributions/*` | Create agendas, sub-agendas and dispatches. Create contributions or edit their summaries and tags. Previously published full text is immutable. |
+| `council/*` | Plan a topic, dispatch a round, synthesize, conclude an agenda or generate a report. List runs and cancel or retry by `runId`. |
+| `reports/*` | Publish a report or retrieve it separately with `topicId` and `reportId`. Reports and offline viewers accept a locale for the publication interface. |
+| `archives/*, exports/*` | Create and list archives. Import through `import-begin`, `import-chunk`, `import-commit`. Download numbered 512 KiB chunks for ZIP, standalone HTML or Markdown bundles. |
+| `operations/get, events/since, transfers/release` | Poll pending receipts by `operationId`. For large JSON results, assemble the base64 chunks as UTF-8 and release the transfer. Replay events from a cursor and refresh if the log was truncated. |
 
-1. Set the release version in `manifest.json` and the npm package metadata. Build, pack and run the validation commands above.
-2. `dist-release/` contains `the-althing.zip`, the individual `icon.png`, any declared screenshots, `SHA256SUMS.txt`, and `sources-the-althing.json`. The ZIP has a root manifest. The packer uses the council's own DEFLATE/STORE writer.
-3. Publish a stable release of the manifest's public GitHub repository. Attach exactly one ZIP named `the-althing.zip`, the separate image assets with their generated filenames, `SHA256SUMS.txt`, and `sources-the-althing.json`. Give changed ZIP bytes a new version.
-4. Submit the public repository URL through the marketplace's extension submission issue form. The registry maintainers can copy `sources-the-althing.json` to `sources/the-althing.json`. Registry CI validates the public release and generates catalog metadata. [Marketplace registry and submission instructions](https://github.com/BytePioneer-AI/codexhost-extensions-registry)
- 
-Local validation runs the upstream validator pinned in `package-lock.json` against a local representation of the prospective GitHub release. It checks the on-disk release assets, compares packaged files with `dist/`, and links the page and Web module graphs with browser Rollup. Public release availability and catalog acceptance are checked by the registry after submission.
-
-## Calling the backend
+<details>
+<summary>RPC examples, orchestration and storage</summary>
 
 Every method starts with `althing/`. `capabilities` returns the registered methods. Resource fields use the Althing protocol’s snake_case names. RPC envelopes use camelCase IDs. For example, a page can create a council with `topics/create` and then schedule an opening round with `council/dispatch-round`.
 
@@ -152,17 +168,46 @@ Here `invoke` denotes the shared RPC client method `rpc.call`, which handles bot
 
 The reader requests `summaryOnly: true` on entry. Each sub-agenda carries its contribution summaries once. Dispatches reference them by `contribution_ids`. The empty `full_content` and `prompt_full` fields have matching Unicode character counts in `full_content_length` and `prompt_full_length`. Expanding a response or prompt fetches `{ text }` from `topics/body` with kind `contribution` or `dispatch`. Omitting `summaryOnly` returns the complete topic tree.
 
-## Council runs
+#### Council runs
 
 - Dispatch accepts `round_number`, `round_type`, `target_panelist_ids`, `target_contribution_ids`, `prompt_full`, `prompt_summary`, and `refs`. Critiques and rebuttals continue the panelist’s existing thread. A sequential sub-agenda admits one slot at a time. Completed panelist slots contribute to progress, with one final slot reserved for synthesis.
 - Moderator actions use `topicId`. `synthesize-sub-agenda` also takes `subAgendaId`. `conclude-agenda` takes `agendaId` and optional `publishReport`. `generate-report` accepts an optional `agendaId` and `completeTopic` for a final report. `plan-topic` appends the returned agenda plan after validating its dependencies. Moderator actions accept an optional `prompt` and `moderator_config`.
 - `council/runs({ topicId })` returns persisted runs. `cancel-run` and `retry-run` take `{ topicId, runId }`. Cancellation of an active thread is asynchronous. A retry has a new run ID and the same discussion slot.
-- The Host reads backend settings on activation. Reactivate after changing the data directory, endpoint, token, or default protocol. Open views subscribe to theme and sidebar settings.
+- The Host reads backend settings on activation. Reactivate after changing the data directory, endpoint, token, or default protocol. Open views subscribe to language, theme and sidebar settings.
 - Import creates an archived topic with fresh resource IDs and a first archive snapshot. Historical run links point to the restored resources. An unfinished source turn is recorded as cancelled in the copy, and its original status is retained in `archivedStatus`. Thread handles in the imported roster are historical.
 
-## Storage and verification
+#### Storage and verification
 
 The Host IPC thread and the storage/orchestration worker share one process. The worker has a 128 MiB old-space limit. Storage writes stage private files, commit a redo journal, and recover interrupted transactions on open. Report bodies reside in separate files. The local Host credential file is discovered from the Host data root independently of a custom council directory.
 
 The frontend tests mount the production bundles in Shadow DOM and exercise the Desktop sidebar, the Web panel, and chunked transfers. Backend tests validate protocol schemas, Python v1 archive compatibility, storage recovery and a complete council against an in-process HTTP Host. Packaging tests run the pinned registry validator on valid and invalid release fixtures. The binary fixture in `tests/fixtures/python-v1.zip` came from the repository’s Python archive writer.
 
+</details>
+
+<a id="contributing"></a>
+
+## Contributing
+
+Open an issue with the host version, language and steps to reproduce. For a change, open a focused pull request, add the relevant tests and run the checks above. For translations, update the shared catalog in `src/shared/`, check the language in both the workspace and the composer hint, and include a screenshot of changed controls.
+
+[Issues](https://github.com/mythezone/codexhost-ext-the-althing/issues) · [Pull requests](https://github.com/mythezone/codexhost-ext-the-althing/pulls)
+
+<a id="contributors"></a>
+
+## Contributors
+
+Maintained by [@mythezone](https://github.com/mythezone) · [All contributors](https://github.com/mythezone/codexhost-ext-the-althing/graphs/contributors)
+
+<a id="acknowledgements"></a>
+
+## Acknowledgements
+
+CodexHost provides the workspaces, agent catalog and delegation API. The Extensions Registry distributes the marketplace catalog. [CodexHost](https://github.com/BytePioneer-AI/codex-host) · [CodexHost Extensions Registry](https://github.com/BytePioneer-AI/codexhost-extensions-registry)
+
+Built with [React](https://react.dev), [Marked](https://marked.js.org), [DOMPurify](https://github.com/cure53/DOMPurify), [parse5](https://parse5.js.org), [Zod](https://zod.dev), [Lucide](https://lucide.dev), [esbuild](https://esbuild.github.io).
+
+<a id="license"></a>
+
+## License
+
+Distributed under the MIT License. [MIT](../../LICENSE)

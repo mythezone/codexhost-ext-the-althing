@@ -145,7 +145,9 @@ export function installCouncilCommand(
         "";
       if (
         !control.matches('[type="submit"]') &&
-        !/^(?:send(?: message|-button)?|submit|发送(?:消息)?|提交)$/i.test(name)
+        !/^(?:send(?: message|-button)?|submit|发送(?:消息)?|發送(?:訊息|消息)?|傳送(?:訊息)?|(?:メッセージを)?送信(?:する)?|(?:메시지 )?보내기|提交)$/i.test(
+          name,
+        )
       )
         return;
     }
@@ -181,7 +183,7 @@ export function installCouncilCommand(
   window.addEventListener("keydown", key, true);
   window.addEventListener("click", send, true);
   window.addEventListener("submit", send, true);
-  return () => {
+  const dispose = () => {
     hide();
     cancelAnimationFrame(frame);
     window.removeEventListener("beforeinput", beforeInput, true);
@@ -194,4 +196,9 @@ export function installCouncilCommand(
     window.removeEventListener("click", send, true);
     window.removeEventListener("submit", send, true);
   };
+  return Object.assign(dispose, {
+    refreshLabel: () => {
+      if (source) suggest(source);
+    },
+  });
 }

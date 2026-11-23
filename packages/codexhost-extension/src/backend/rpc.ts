@@ -1,3 +1,5 @@
+import { resolveLocale } from "../shared/i18n.ts";
+import { publicationHtml } from "./domain/rendering.ts";
 import { sameAssignment } from "../shared/agents.ts";
 import { z } from "zod";
 import { jsonBytes } from "./json-bytes.ts";
@@ -139,6 +141,7 @@ export async function engine(
     const p = input(params ?? {}),
       tid = () => id.parse(p.topicId),
       chunk = () => index.parse(p.chunkIndex);
+    const locale = resolveLocale(p.locale ?? settings.language);
     switch (method) {
       case "capabilities":
         return capabilities(methods);
@@ -242,10 +245,20 @@ export async function engine(
       case "topics/delete":
         return store.remove(tid());
       case "reports/get":
-        return store.serial(() => store.report(tid(), id.parse(p.reportId)));
+        return store.serial(async () => {
+          const r = await store.report(tid(), id.parse(p.reportId));
+          if (!p.locale) return r;
+          return { ...r, html_content: publicationHtml(r, locale) };
+        });
       case "archives/create":
         return store.transaction(tid(), (c, files) =>
-          snapshot(store, c, files, z.record(json).parse(p.metadata ?? {})),
+          snapshot(
+            store,
+            c,
+            files,
+            z.record(json).parse(p.metadata ?? {}),
+            locale,
+          ),
         );
       case "archives/list":
         return store.serial(async () => (await store.load(tid())).archives);
@@ -268,10 +281,10 @@ export async function engine(
         );
         const bytes =
           format === "standalone-html"
-            ? exportStandaloneHtml(t)
+            ? exportStandaloneHtml(t, locale)
             : format === "markdown-bundle"
               ? exportMarkdownBundle(t)
-              : archiveZip(t);
+              : archiveZip(t, locale);
         const key = await store.cacheDownload(
           bytes,
           t.id + (format === "standalone-html" ? ".html" : ".zip"),
@@ -292,7 +305,7 @@ export async function engine(
           receipt = await store.serial(() => store.receipt(key));
         if (receipt) return receipt;
         const tree = inspectArchiveZip(await store.uploaded(key), true);
-        return { topicId: await restoreArchive(store, tree, key) };
+        return { topicId: await restoreArchive(store, tree, key, locale) };
       }
       case "transfers/release":
         return store.serial(() => store.release(id.parse(p.transferId)));
@@ -302,15 +315,15 @@ export async function engine(
           id.optional().parse(p.topicId),
         );
       case "council/dispatch-round":
-        return council.dispatchRound(tid(), id.parse(p.subAgendaId), p);
+        return council.dispatchRound(tid(), id.parse(p.subAgendaId), { ...p, locale });
       case "council/synthesize-sub-agenda":
-        return council.moderate("synthesis", tid(), p);
+        return council.moderate("synthesis", tid(), { ...p, locale });
       case "council/conclude-agenda":
-        return council.moderate("agenda_conclusion", tid(), p);
+        return council.moderate("agenda_conclusion", tid(), { ...p, locale });
       case "council/generate-report":
-        return council.moderate("report", tid(), p);
+        return council.moderate("report", tid(), { ...p, locale });
       case "council/plan-topic":
-        return council.moderate("plan", tid(), p);
+        return council.moderate("plan", tid(), { ...p, locale });
       case "council/cancel-run":
         return council.cancel(tid(), id.parse(p.runId));
       case "council/retry-run":
@@ -323,6 +336,7 @@ export async function engine(
     if (!spec || !["create", "publish", "update"].includes(action))
       throw Error("Unknown RPC method");
     return store.transaction(tid(), (c) => {
+      c.reportLocale = locale;
       const r =
         action === "update"
           ? c.patch(spec.kind, id.parse(p[spec.key]), p.patch ?? p.data)

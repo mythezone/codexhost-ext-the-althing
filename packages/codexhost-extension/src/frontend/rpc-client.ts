@@ -49,6 +49,7 @@ export function saveBlob(blob: Blob, name: string, doc = document) {
   }
 }
 export class RpcClient {
+  locale?: import("../shared/i18n").Locale;
   constructor(
     private backend: Backend,
     readonly signal?: AbortSignal,
@@ -75,8 +76,8 @@ export class RpcClient {
               "contribution_ids" in d
                 ? {
                     ...d,
-                    contributions: d.contribution_ids.map((id) =>
-                      byId.get(id)!,
+                    contributions: d.contribution_ids.map(
+                      (id) => byId.get(id)!,
                     ),
                   }
                 : d,
@@ -127,6 +128,20 @@ export class RpcClient {
   }
   private async result(method: string, params: Params, signal?: AbortSignal) {
     signal?.throwIfAborted();
+    if (
+      this.locale &&
+      [
+        "reports/publish",
+        "reports/get",
+        "exports/download-chunk",
+        "archives/create",
+        "archives/import-commit",
+        "council/dispatch-round",
+        "council/conclude-agenda",
+        "council/generate-report",
+      ].includes(method)
+    )
+      params = { locale: this.locale, ...params };
     let v = await this.backend.invoke("althing/" + method, params);
     while (v?.operationId && v.status === "pending") {
       await pause(250, signal);

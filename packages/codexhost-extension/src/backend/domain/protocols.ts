@@ -1,3 +1,4 @@
+import { translate, type Locale } from "../../shared/i18n.ts";
 import type { Topic, SubAgenda, Contribution } from "./models.ts";
 
 const definitions = [
@@ -90,13 +91,24 @@ export function roundPrompt(
   s: SubAgenda,
   type: string,
   targets: Contribution[],
+  locale: Locale = "en",
 ) {
+  const l = (en: string, zh: string) => translate(locale, en, zh);
   const instruction =
     type === "critique"
-      ? "Identify the strongest supported claim, a consequential disagreement, and an observation that could resolve it. Cite the public contribution IDs."
+      ? l(
+          "Identify the strongest supported claim, a consequential disagreement, and an observation that could resolve it. Cite the public contribution IDs.",
+          "指出证据最充分的主张、一个重要分歧，以及能够澄清分歧的观察。引用公开发言的 ID。",
+        )
       : type === "rebuttal"
-        ? "Address the cited critique. State your revised conclusion, what evidence changed it, and what remains unresolved."
-        : "Give your independent public assessment, evidence for each finding, assumptions, and unresolved uncertainty.";
+        ? l(
+            "Address the cited critique. State your revised conclusion, what evidence changed it, and what remains unresolved.",
+            "回应引用的质询，说明修订后的结论、促使你改判的证据，以及未解决的问题。",
+          )
+        : l(
+            "Give your independent public assessment, evidence for each finding, assumptions, and unresolved uncertainty.",
+            "给出独立的公开评估，说明每项结论的证据、前提假设和尚存的不确定性。",
+          );
   return [
     t.title,
     t.description,
@@ -110,7 +122,10 @@ export function roundPrompt(
     ...targets.map(
       (c) => c.id + " / " + c.panelist_name + "\n" + c.full_content,
     ),
-    "Return public Markdown with a concise lead, 3–5 principal findings as bullets, and optional Stance tags: on the last line.",
+    l(
+      "Return public Markdown with a concise lead, 3–5 principal findings as bullets, and optional Stance tags: on the last line.",
+      "使用 Markdown，以简短摘要开头，用列表列出 3–5 项主要发现。可在末行用 Stance tags: 标注立场。",
+    ),
   ]
     .filter(Boolean)
     .join("\n\n");

@@ -1,7 +1,7 @@
 {
   "manifestVersion": 2,
   "id": "the-althing",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "name": {
     "en": "The Althing",
     "zh-CN": "议事厅"
@@ -11,12 +11,65 @@
     "zh-CN": "在 CodexHost 项目中召集专家议会并发布研究结论。"
   },
   "details": {
-    "en": "### Inside the council\n\n- Start with `/althing` in Desktop or Web chat. Ask the moderator to propose an agenda for your topic.\n- Convene a panel from the harnesses and models available on your Host. Pick the Host’s collaboration defaults or assign agents, models, thinking levels and roles in the wizard or expert roster.\n- Follow opening statements, peer critiques and rebuttals in the agenda discussion. Open a delegated thread to inspect its work.\n- Publish agenda conclusions and final reports. Download a standalone publication or transfer the complete council as a portable ZIP.",
-    "zh-CN": "### 在议事厅中\n\n- 在桌面或网页聊天框输入 `/althing` 发起会议，可请主持模型按主题拟订议程。\n- 从本机可用的智能体和模型中选出专家与主持人，可一键加入已就绪的协作专家，也可在向导或专家名册中手动配置 Agent、模型、推理强度和会议角色。\n- 按议程跟进独立分析、交叉质询与反驳，打开子会话查看实时进展。\n- 发布议程结论和总报告，下载独立出版物，或通过 ZIP 在不同主机之间迁移完整议题。"
+    "en": "### Inside the council\n\n- Start with `/althing` in Desktop or Web chat. Ask the moderator to propose an agenda for your topic.\n- Convene a panel from the harnesses and models available on your Host. Pick the Host’s collaboration defaults or assign agents, models, thinking levels and roles in the wizard or expert roster.\n- Follow opening statements, peer critiques and rebuttals in the agenda discussion. Open a delegated thread to inspect its work.\n- Publish agenda conclusions and final reports. Download a standalone publication or transfer the complete council as a portable ZIP.\n- Follow the Host language or choose English, Simplified Chinese, Traditional Chinese, Japanese or Korean in plugin settings.",
+    "zh-CN": "### 在议事厅中\n\n- 在桌面或网页聊天框输入 `/althing` 发起会议，可请主持模型按主题拟订议程。\n- 从本机可用的智能体和模型中选出专家与主持人，可一键加入已就绪的协作专家，也可在向导或专家名册中手动配置 Agent、模型、推理强度和会议角色。\n- 按议程跟进独立分析、交叉质询与反驳，打开子会话查看实时进展。\n- 发布议程结论和总报告，下载独立出版物，或通过 ZIP 在不同主机之间迁移完整议题。\n- 界面可跟随宿主语言，也可在插件设置中选择英语、简体中文、繁体中文、日语或韩语。"
   },
   "author": "mythezone",
   "categories": ["workflow", "tools"],
   "settingsSchema": [
+    {
+      "key": "language",
+      "type": "select",
+      "label": {
+        "en": "Interface language",
+        "zh-CN": "界面语言"
+      },
+      "default": "auto",
+      "options": [
+        {
+          "value": "auto",
+          "label": {
+            "en": "Follow CodexHost",
+            "zh-CN": "跟随 CodexHost"
+          }
+        },
+        {
+          "value": "en",
+          "label": {
+            "en": "English",
+            "zh-CN": "英语"
+          }
+        },
+        {
+          "value": "zh-CN",
+          "label": {
+            "en": "Simplified Chinese · 简体中文",
+            "zh-CN": "简体中文"
+          }
+        },
+        {
+          "value": "zh-TW",
+          "label": {
+            "en": "Traditional Chinese · 繁體中文",
+            "zh-CN": "繁体中文"
+          }
+        },
+        {
+          "value": "ja",
+          "label": {
+            "en": "Japanese · 日本語",
+            "zh-CN": "日语 · 日本語"
+          }
+        },
+        {
+          "value": "ko",
+          "label": {
+            "en": "Korean · 한국어",
+            "zh-CN": "韩语 · 한국어"
+          }
+        }
+      ]
+    },
     {
       "key": "dataDir",
       "type": "string",

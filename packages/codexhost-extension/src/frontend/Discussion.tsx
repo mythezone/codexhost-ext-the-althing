@@ -100,8 +100,8 @@ function ResponseCard({
               <button className="reply" key={id} onClick={() => jump(target)}>
                 <Reply size={14} aria-hidden="true" />
                 {l("Reply to", "回应")}{" "}
-                {target.c.panelist_name || target.c.panelist_id} · Round{" "}
-                {target.c.round_number}
+                {target.c.panelist_name || target.c.panelist_id} ·{" "}
+                {l("Round", "轮次")} {target.c.round_number}
               </button>
             )
           );
@@ -174,7 +174,9 @@ export function Discussion({
       {rounds.map((n) => (
         <section key={n}>
           <div className="round">
-            <span>Round {n}</span>
+            <span>
+              {l("Round", "轮次")} {n}
+            </span>
             <hr />
           </div>
           {s.dispatches

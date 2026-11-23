@@ -1,3 +1,4 @@
+import { resolveLocale, translate, type Locale } from "../shared/i18n.ts";
 import { sameAssignment } from "../shared/agents.ts";
 import path from "node:path";
 import { z } from "zod";
@@ -48,6 +49,7 @@ export type Run = {
   agendaId?: string;
   subAgendaId?: string;
   dispatchId?: string;
+  locale?: Locale;
   panelistId?: string;
   attribution?: {
     panelist_name: string;
@@ -334,7 +336,7 @@ function progress(c: Council, subId: string) {
   if (s.status !== "completed")
     c.patch("sub_agenda", s.id, {
       progress_pct: meanPercent(done.size * 100, slots.size + 1),
-      current_activity: done.size + " / " + slots.size + " panelist responses",
+      current_activity: done.size + " / " + slots.size + " " + translate(runs.at(-1)?.locale ?? "en", "panelist responses", "专家已发言"),
     });
 }
 function makeRun(tid: string, kind: RunKind, cfg: Config): Run {
@@ -473,12 +475,13 @@ export class Orchestrator {
         .array(id)
         .parse(params.target_contribution_ids ?? [])
         .map((k) => c.get("contribution", k));
+      const locale = resolveLocale(params.locale);
       const prompt = z
         .string()
         .min(1)
         .parse(
           params.prompt_full ??
-            roundPrompt(hydrate(t), { ...sub, dispatches: [] }, round, targets),
+            roundPrompt(hydrate(t), { ...sub, dispatches: [] }, round, targets, locale),
         );
       const d = c.create(
         "dispatch",
@@ -504,6 +507,7 @@ export class Orchestrator {
         );
         const r: Run = {
           ...makeRun(tid, "panelist", cfg),
+          locale,
           panelistId: pid,
           attribution: {
             panelist_name: p.name,
@@ -563,6 +567,7 @@ export class Orchestrator {
           },
       );
       const r = makeRun(tid, kind, cfg);
+      r.locale = resolveLocale(p.locale);
       if (kind === "synthesis") {
         const sub = c.get("sub_agenda", p.subAgendaId);
         r.subAgendaId = sub.id;
@@ -862,7 +867,7 @@ export class Orchestrator {
             kind: r.contributionKind,
             target_contribution_ids: r.targetContributionIds,
             full_content: text,
-            summary: summary || "见发言全文。",
+            summary: summary || translate(r.locale ?? "en", "See the full response.", "见发言全文。"),
             key_points,
             stance_tags,
             duration_ms: Math.max(0, Date.now() - Date.parse(r.startedAt)),
@@ -917,17 +922,29 @@ export class Orchestrator {
             open_disagreements,
             status: "completed",
           });
+          const locale =
+            r.locale && r.locale !== "en"
+              ? r.locale
+              : /[ぁ-ヿ]/u.test(summary)
+                ? "ja"
+                : /[가-힣]/u.test(summary)
+                  ? "ko"
+                  : /\p{Script=Han}{2}/u.test(summary)
+                    ? "zh-CN"
+                    : "en";
+          const l = (en: string, zh: string) => translate(locale, en, zh);
           body = [
-            "## 结论摘要",
+            "## " + l("Summary", "结论摘要"),
             summary,
-            "## 关键结论",
+            "## " + l("Key Findings", "关键结论"),
             key_points.map((p) => "- " + p).join("\n") ||
-              "主持人未列出关键结论。",
-            "## 未决分歧",
+              l("No key findings were listed.", "主持人未列出关键结论。"),
+            "## " + l("Open Disagreements", "未决分歧"),
             open_disagreements.map((p) => "- " + p).join("\n") ||
-              "主持人未列出未决分歧。",
+              l("No open disagreements were listed.", "主持人未列出未决分歧。"),
           ].join("\n\n");
         }
+        c.reportLocale = r.locale ?? "en";
         if (r.kind === "report" || r.publishReport)
           r.reportId = c.create(
             "report",

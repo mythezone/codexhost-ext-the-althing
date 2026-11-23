@@ -11,17 +11,17 @@ import {
   type Kind,
   type Json,
 } from "./models.ts";
-import { offlineView } from "./rendering.ts";
+import { offlineView, publicationHtml } from "./rendering.ts";
 import { readZip, writeZip } from "./zip.ts";
 import { archivePath, type Store, type Files } from "../storage.ts";
 
 export const sha256 = (b: Buffer) =>
   createHash("sha256").update(b).digest("hex");
 import { jsonBytes, parseJsonBytes } from "../json-bytes.ts";
-export function archiveZip(t: Topic) {
+export function archiveZip(t: Topic, locale = "en") {
   const files = new Map<string, Buffer>([
     ["topic.json", jsonBytes(t)],
-    ["index.html", Buffer.from(offlineView(t))],
+    ["index.html", Buffer.from(offlineView(t, { locale }))],
     [
       "README.md",
       Buffer.from(
@@ -32,7 +32,7 @@ export function archiveZip(t: Topic) {
   for (const r of t.reports)
     files.set(
       "reports/" + id.parse(r.id) + ".html",
-      Buffer.from(r.html_content!),
+      Buffer.from(publicationHtml(r, locale)),
     );
   files.set(
     "manifest.json",
@@ -48,8 +48,8 @@ export function archiveZip(t: Topic) {
   );
   return writeZip(files);
 }
-export const exportStandaloneHtml = (t: Topic) =>
-  Buffer.from(offlineView(t, { embedReports: true }));
+export const exportStandaloneHtml = (t: Topic, locale?: string) =>
+  Buffer.from(offlineView(t, { embedReports: true, locale }));
 export function exportMarkdownBundle(t: Topic) {
   const files = new Map([
     [
@@ -134,9 +134,10 @@ export async function snapshot(
   c: Council,
   files: Files,
   metadata: Record<string, Json> = {},
+  locale?: string,
 ) {
   const t = hydrate(await store.full(c.tree), true),
-    blob = archiveZip(t),
+    blob = archiveZip(t, locale),
     aid = uid();
   const row: Archive = {
     id: aid,
@@ -156,9 +157,15 @@ export async function snapshot(
   c.emit("archive.created", aid);
   return row;
 }
-export function restoreArchive(store: Store, t: Topic, uploadId?: string) {
+export function restoreArchive(
+  store: Store,
+  t: Topic,
+  uploadId?: string,
+  locale = "en",
+) {
   return store
     .transaction(null, async (c, files) => {
+      c.reportLocale = locale;
       if (uploadId) {
         const previous = await store.receipt(uploadId);
         if (previous) {
@@ -313,7 +320,7 @@ export function restoreArchive(store: Store, t: Topic, uploadId?: string) {
         for (const k of ["created_at", "updated_at", "completed_at"])
           if (old[k]) Reflect.set(row, k, old[k]);
       }
-      await snapshot(store, c, files, { restored_from: t.id });
+      await snapshot(store, c, files, { restored_from: t.id }, locale);
       if (uploadId)
         files.set(
           store.receiptPath(uploadId),

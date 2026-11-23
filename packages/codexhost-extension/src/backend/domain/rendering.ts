@@ -1,3 +1,4 @@
+import { resolveLocale, translate, type Locale } from "../../shared/i18n.ts";
 import { createHash } from "node:crypto";
 import { Marked } from "marked";
 import {
@@ -67,9 +68,11 @@ const mast = (label: string, title: string, subtitle: string) =>
   "</div></div>" +
   owl +
   "</div>";
-function page(title: string, body: string, script = controls) {
+function page(title: string, body: string, locale: Locale, script = controls) {
   return (
-    '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="' +
+    '<!doctype html><html lang="' +
+    locale +
+    '"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="' +
     policy(script) +
     '"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' +
     escape(title) +
@@ -80,7 +83,12 @@ function page(title: string, body: string, script = controls) {
     assets.readerCss +
     "</style></head><body><header><strong>" +
     book +
-    "The Althing</strong><button data-mode>明暗模式</button><button data-print>打印 / PDF</button></header><main>" +
+    translate(locale, "The Althing", "议事厅") +
+    "</strong><button data-mode>" +
+    translate(locale, "Light / Dark", "明暗模式") +
+    "</button><button data-print>" +
+    translate(locale, "Print / PDF", "打印 / PDF") +
+    "</button></header><main>" +
     body +
     "</main><script>" +
     script +
@@ -133,11 +141,16 @@ function md(source: string, headings?: string[]) {
     .childNodes.map(clean)
     .join("");
 }
-export function markdownReport(r: Report, topicTitle: string) {
+export function markdownReport(r: Report, topicTitle: string, language = "en") {
+  const locale = resolveLocale(language);
   const links: string[] = [];
   const body = md(r.markdown_content ?? "", links);
   const toc = links.length
-    ? '<details class="toc"><summary>目录</summary><nav aria-label="报告目录">' +
+    ? '<details class="toc"><summary>' +
+      translate(locale, "Contents", "目录") +
+      '</summary><nav aria-label="' +
+      translate(locale, "Report contents", "报告目录") +
+      '">' +
       links.join("") +
       "</nav></details>"
     : "";
@@ -151,9 +164,11 @@ export function markdownReport(r: Report, topicTitle: string) {
       '<article class="body">' +
       body +
       "</article></div>",
+    locale,
   );
 }
-export function authoredReport(r: Report) {
+export function authoredReport(r: Report, language = "en") {
+  const locale = resolveLocale(language);
   const restrictions =
     "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; media-src data:; frame-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'";
   const doc = parse(r.source_html ?? r.html_content ?? "");
@@ -191,7 +206,9 @@ export function authoredReport(r: Report) {
   const forward =
     "function printArticle(){document.querySelector('iframe').contentWindow.postMessage('althing.print','*')}document.querySelector('button').onclick=printArticle;window.addEventListener('message',e=>{if(e.source===parent&&e.data==='althing.print')printArticle()});";
   return (
-    '<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="' +
+    '<!doctype html><html lang="' +
+    locale +
+    '"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="' +
     restrictions.replace("frame-src 'none'", "frame-src about:") +
     '"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' +
     escape(r.title) +
@@ -199,7 +216,10 @@ export function authoredReport(r: Report) {
     assets.css +
     "html,body{height:100%}body{display:flex;flex-direction:column}iframe{flex:1;min-height:0;width:100%;border:0}</style></head><body><header><strong>" +
     book +
-    'The Althing</strong><button>打印 / PDF</button></header><iframe title="' +
+    translate(locale, "The Althing", "议事厅") +
+    "</strong><button>" +
+    translate(locale, "Print / PDF", "打印 / PDF") +
+    '</button></header><iframe title="' +
     escape(r.title) +
     '" sandbox="allow-scripts allow-modals" srcdoc="' +
     escape(serialize(doc)) +
@@ -208,8 +228,96 @@ export function authoredReport(r: Report) {
     "</script></body></html>"
   );
 }
-export const renderReport = (r: Report, title: string) =>
-  r.format === "html" ? authoredReport(r) : markdownReport(r, title);
+export const renderReport = (r: Report, title: string, locale = "en") =>
+  r.format === "html"
+    ? authoredReport(r, locale)
+    : markdownReport(r, title, locale);
+// Localize only the publication chrome. Source offsets preserve authored documents and CSP hashes.
+export function publicationHtml(report: Report, language: string) {
+  const source = report.html_content ?? "";
+  const locale = resolveLocale(language);
+  if (
+    !source ||
+    source.startsWith('<!doctype html><html lang="' + locale + '">')
+  )
+    return source;
+  const doc = parse(source, { sourceCodeLocationInfo: true });
+  function elements(parent?: P.ParentNode) {
+    return (parent?.childNodes ?? []).filter(
+      (n): n is P.Element => "tagName" in n,
+    );
+  }
+  const html = elements(doc).find((e) => e.tagName === "html");
+  const body = elements(html).find((e) => e.tagName === "body");
+  const header = elements(body).find((e) => e.tagName === "header");
+  const controls = elements(header);
+  const brand = controls.find((e) => e.tagName === "strong");
+  const buttons = controls.filter((e) => e.tagName === "button");
+  const has = (el: P.Element, name: string) =>
+    el.attrs.some((a) => a.name === name);
+  const mode = buttons.find((e) => has(e, "data-mode"));
+  const print =
+    buttons.find((e) => has(e, "data-print")) ??
+    (elements(body).some((e) => e.tagName === "iframe") && buttons.length === 1
+      ? buttons[0]
+      : undefined);
+  if (
+    !html?.sourceCodeLocation?.startTag ||
+    !brand ||
+    !print ||
+    !elements(brand).some((e) => e.tagName === "img")
+  )
+    return source;
+  const edits: { start: number; end: number; text: string }[] = [];
+  function edit(
+    loc: { startOffset: number; endOffset: number } | null | undefined,
+    text: string,
+  ) {
+    if (loc) edits.push({ start: loc.startOffset, end: loc.endOffset, text });
+  }
+  function label(el: P.Element | undefined, en: string, zh: string) {
+    const text = el?.childNodes.find(
+      (n) => n.nodeName === "#text" && (n as P.TextNode).value.trim(),
+    );
+    edit(text?.sourceCodeLocation, escape(translate(locale, en, zh)));
+  }
+  const lang = html.sourceCodeLocation.attrs?.lang;
+  if (lang) edit(lang, 'lang="' + locale + '"');
+  else {
+    const end = html.sourceCodeLocation.startTag.endOffset - 1;
+    edits.push({ start: end, end, text: ' lang="' + locale + '"' });
+  }
+  label(brand, "The Althing", "议事厅");
+  label(mode, "Light / Dark", "明暗模式");
+  label(print, "Print / PDF", "打印 / PDF");
+  const main = elements(body).find((e) => e.tagName === "main");
+  const layout = elements(main).find((e) =>
+    e.attrs.some(
+      (a) => a.name === "class" && a.value.split(/\s+/).includes("layout"),
+    ),
+  );
+  const toc = elements(layout).find(
+    (e) =>
+      e.tagName === "details" &&
+      e.attrs.some((a) => a.name === "class" && a.value === "toc"),
+  );
+  label(
+    elements(toc).find((e) => e.tagName === "summary"),
+    "Contents",
+    "目录",
+  );
+  const nav = elements(toc).find((e) => e.tagName === "nav");
+  edit(
+    nav?.sourceCodeLocation?.attrs?.["aria-label"],
+    'aria-label="' +
+      escape(translate(locale, "Report contents", "报告目录")) +
+      '"',
+  );
+  let result = source;
+  for (const e of edits.sort((a, b) => b.start - a.start))
+    result = result.slice(0, e.start) + e.text + result.slice(e.end);
+  return result;
+}
 const bullets = (items: string[]) =>
   items.length
     ? "<ul>" + items.map((s) => "<li>" + md(s) + "</li>").join("") + "</ul>"
@@ -223,21 +331,23 @@ const tabbar = (items: string[], prefix: string) =>
     )
     .join("") +
   "</nav>";
-function subView(s: SubAgenda) {
+function subView(s: SubAgenda, locale: Locale) {
   let body = md(s.prompt_framing);
   for (const n of [
     ...new Set(
       [...s.dispatches, ...s.contributions].map((x) => x.round_number),
     ),
   ].sort((a, b) => a - b)) {
-    body += "<h3>Round " + n + "</h3>";
+    body += "<h3>" + translate(locale, "Round", "轮次") + " " + n + "</h3>";
     for (const d of s.dispatches.filter((d) => d.round_number === n))
       body +=
         "<article><b>" +
         escape(d.moderator_name + " · " + d.title) +
         "</b>" +
         md(d.prompt_summary) +
-        "<details><summary>展开主持人任务</summary>" +
+        "<details><summary>" +
+        translate(locale, "Show moderator prompt", "展开主持人任务") +
+        "</summary>" +
         md(d.prompt_full) +
         "</details></article>";
     for (const c of s.contributions.filter((c) => c.round_number === n))
@@ -248,21 +358,35 @@ function subView(s: SubAgenda) {
         escape(c.model) +
         md(c.summary) +
         bullets(c.key_points) +
-        "<details><summary>展开完整原文</summary>" +
+        "<details><summary>" +
+        translate(locale, "Show full response", "展开完整原文") +
+        "</summary>" +
         md(c.full_content) +
         "</details></article>";
   }
   return (
     body +
-    (s.synthesis_summary ? "<h3>子议程综述</h3>" + md(s.synthesis_summary) : "")
+    (s.synthesis_summary
+      ? "<h3>" +
+        translate(locale, "Sub-agenda synthesis", "子议程综述") +
+        "</h3>" +
+        md(s.synthesis_summary)
+      : "")
   );
 }
-export function offlineView(t: Topic, { embedReports = false } = {}) {
+export function offlineView(
+  t: Topic,
+  {
+    embedReports = false,
+    locale: language,
+  }: { embedReports?: boolean; locale?: string } = {},
+) {
+  const locale = resolveLocale(language);
   const link = (r: Report) =>
     '<p><a href="' +
     (embedReports
       ? "data:text/html;base64," +
-        Buffer.from(reportDocument(r.html_content ?? "", false)).toString(
+        Buffer.from(reportDocument(publicationHtml(r, locale), false)).toString(
           "base64",
         ) +
         '" download="' +
@@ -275,7 +399,10 @@ export function offlineView(t: Topic, { embedReports = false } = {}) {
   let body =
     mast(t.protocol_id, t.title, t.subtitle) +
     tabbar(
-      ["总览", ...t.agendas.map((a) => a.code + " · " + a.title)],
+      [
+        translate(locale, "Overview", "总览"),
+        ...t.agendas.map((a) => a.code + " · " + a.title),
+      ],
       "agenda-",
     );
   body +=
@@ -313,10 +440,10 @@ export function offlineView(t: Topic, { embedReports = false } = {}) {
         '"><h3>' +
         escape(s.title) +
         "</h3>" +
-        subView(s) +
+        subView(s, locale) +
         "</section>";
     });
     body += "</section>";
   });
-  return page(t.title, body, controls + tabs);
+  return page(t.title, body, locale, controls + tabs);
 }

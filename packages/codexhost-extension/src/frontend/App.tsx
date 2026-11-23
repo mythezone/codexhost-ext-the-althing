@@ -1,4 +1,6 @@
+import { resolveLocale, translate } from "../shared/i18n";
 import {
+  useLayoutEffect,
   startTransition,
   useState,
   useEffect,
@@ -54,7 +56,7 @@ function App({
   container: HTMLElement;
   rpc: RpcClient;
 }) {
-  const [locale, setLocale] = useState(api.locale || "en"),
+  const [hostLocale, setLocale] = useState(api.locale || "en"),
     [scheme, setScheme] = useState(api.colorScheme || "light"),
     [selected, setSelected] = useState("auto");
   const [settingsReady, ready] = useState(false);
@@ -76,8 +78,12 @@ function App({
     [busy, setBusy] = useState(false),
     lock = useRef(false),
     [version, refresh] = useReducer((n: number) => n + 1, 0);
+  const locale = resolveLocale(hostLocale, settings.language);
+  useLayoutEffect(() => {
+    rpc.locale = locale;
+  }, [rpc, locale]);
   const l = useCallback(
-    (en: string, zh: string) => (locale.startsWith("zh") ? zh : en),
+    (en: string, zh: string) => translate(locale, en, zh),
     [locale],
   );
   const navigate = useCallback(
@@ -316,6 +322,7 @@ function App({
             refresh,
             perform,
             busy,
+            locale,
             scheme: theme.scheme,
             error,
           }}

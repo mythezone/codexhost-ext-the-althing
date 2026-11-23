@@ -9,6 +9,7 @@ export const useL = () => useContext(LocaleContext);
 export const AssetContext = createContext<Record<string, string>>({});
 export const useAssets = () => useContext(AssetContext);
 export type Workspace = {
+  locale?: import("../shared/i18n").Locale;
   rpc: RpcClient;
   settings: Record<string, unknown>;
   projects: Project[];

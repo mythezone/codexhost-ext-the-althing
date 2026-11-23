@@ -1,3 +1,4 @@
+import { resolveLocale, translate as localize } from "../shared/i18n";
 import { installCouncilCommand } from "./composer-command";
 import { mountWorkspace } from "../frontend/App";
 import {
@@ -70,7 +71,8 @@ function activate(api: Desktop) {
     rpc = new RpcClient(api.backend, ctrl.signal);
   let topVisibility: "active" | "always" | "hidden" = "active",
     groupsEnabled = true,
-    english = true,
+    hostLocale = "en",
+    preference: unknown = "auto",
     rows: readonly Row[] = [],
     cards: Card[] = [],
     projects: Project[] = [],
@@ -88,7 +90,8 @@ function activate(api: Desktop) {
   const topText = document.createElement("span"),
     pill = document.createElement("small");
   top.append(icon(), topText, pill);
-  const translate = (en: string, zh: string) => (english ? en : zh);
+  const translate = (en: string, zh: string) =>
+    localize(resolveLocale(hostLocale, preference), en, zh);
   function close() {
     resize?.disconnect();
     measured = [];
@@ -416,11 +419,14 @@ function activate(api: Desktop) {
     schedule();
   });
   const offAppearance = listenAppearance(api, document, (loc) => {
-    english = !loc.startsWith("zh");
+    hostLocale = loc;
+    offCommand.refreshLabel();
     schedule();
   });
   let settingsChanged = false;
   const settings = (s: Record<string, unknown>) => {
+    preference = s.language;
+    offCommand.refreshLabel();
     groupsEnabled = s.showProjectAlthingItems !== false;
     topVisibility =
       s.sidebarAlthingVisibility === "always" ||

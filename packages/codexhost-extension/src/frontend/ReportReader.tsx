@@ -14,14 +14,18 @@ export function ReportReader({
   close: () => void;
 }) {
   const l = useL(),
-    { rpc, scheme } = useWorkspace(),
+    { rpc, scheme, locale } = useWorkspace(),
     frame = useRef<HTMLIFrameElement>(null);
   const [report, set] = useState<Report>(),
     [error, fail] = useState("");
   useEffect(() => {
     let live = true;
     rpc
-      .call<Report>("reports/get", { topicId, reportId: id })
+      .call<Report>("reports/get", {
+        topicId,
+        reportId: id,
+        ...(locale && { locale }),
+      })
       .then((r) => {
         if (live) set(r);
       })
@@ -31,7 +35,7 @@ export function ReportReader({
     return () => {
       live = false;
     };
-  }, [rpc, topicId, id]);
+  }, [rpc, topicId, id, locale]);
   const html = useMemo(
     () =>
       report?.html_content &&

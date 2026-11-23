@@ -115,7 +115,7 @@ export function DispatchDialog({
   close: () => void;
 }) {
   const l = useL(),
-    { perform, rpc, busy } = useWorkspace(),
+    { perform, rpc, busy, locale } = useWorkspace(),
     types = ["opening", "critique", "rebuttal", "synthesis_request", "custom"];
   const [type, setType] = useState<string>(
       protocols.find((p) => p.id === topic.protocol_id)?.default_phases[
@@ -168,6 +168,7 @@ export function DispatchDialog({
       selected.map((c) =>
         c.full_content ? c : { ...c, full_content: loaded[c.id] ?? "" },
       ),
+      locale,
     );
   const toggle = (list: string[], id: string) =>
     list.includes(id) ? list.filter((v) => v !== id) : [...list, id];
