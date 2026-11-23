@@ -197,23 +197,35 @@ type DraftAgenda = {
 };
 export function Wizard({
   cwd: initial,
+  commandTopic,
   close,
 }: {
   cwd: string;
+  commandTopic?: string;
   close: () => void;
 }) {
   const l = useL(),
-    { rpc, settings, projects, perform, navigate, busy } = useWorkspace();
+    { rpc, settings, projects, perform, navigate, refresh, busy } =
+      useWorkspace();
+  const guided = commandTopic !== undefined;
+  const expert = (i: number) => ({
+    ...blank(),
+    name: l("Expert ", "专家 ") + (i + 1),
+  });
   const [step, go] = useState(0),
     [cwd, setCwd] = useState(initial),
-    [title, setTitle] = useState(""),
+    [title, setTitle] = useState(commandTopic ?? ""),
     [subtitle, setSubtitle] = useState(""),
     [description, describe] = useState(""),
     [tags, setTags] = useState(""),
     [protocol, setProtocol] = useState(
       String(settings.defaultProtocol || "council-standard"),
     );
-  const [people, roster] = useState<Choice[]>([]),
+  const [people, roster] = useState<Choice[]>(() =>
+      guided ? [expert(0), expert(1)] : [],
+    ),
+    [askModerator, setAskModerator] = useState(guided),
+    [questions, setQuestions] = useState(""),
     [chair, setChair] = useState<Choice | null>(null),
     [agendas, plan] = useState<DraftAgenda[]>([]),
     [ids, setIds] = useState<string[]>([]),
@@ -243,9 +255,22 @@ export function Wizard({
   });
   async function submit() {
     if (step < 2) {
+      if (
+        guided &&
+        step === 0 &&
+        !/^(?:\/|[a-z]:[\\/]|\\\\)/i.test(cwd.trim())
+      ) {
+        setError(
+          l("Choose an absolute workspace path.", "请选择项目或填写绝对路径。"),
+        );
+        return;
+      }
+      if (guided && step === 1 && !people.length) return;
+      setError("");
       go(step + 1);
       return;
     }
+    const moderator = chair || (guided ? people[0] : undefined);
     await perform(async () => {
       const topic = await rpc.call<Topic>("topics/create", {
         data: {
@@ -265,11 +290,11 @@ export function Wizard({
             provider: p.harnessId,
             reasoning_effort: p.thinking,
           })),
-          moderator: chair
+          moderator: moderator
             ? {
                 name: l("Moderator", "主持人"),
-                model: modelName(chair.model),
-                provider: chair.harnessId,
+                model: modelName(moderator.model),
+                provider: moderator.harnessId,
               }
             : {},
           metadata: {
@@ -282,17 +307,37 @@ export function Wizard({
               panelist_threads: Object.fromEntries(
                 people.map((p) => [p.id, config(p)]),
               ),
-              moderator_config: chair ? config(chair) : null,
+              moderator_config: moderator ? config(moderator) : null,
             },
           },
-          agendas: agendas.map((a) => ({
-            title: a.title,
-            sub_agendas: a.subs,
-          })),
+          agendas: askModerator
+            ? []
+            : agendas.map((a) => ({
+                title: a.title,
+                sub_agendas: a.subs,
+              })),
         },
       });
       close();
       navigate({ topicId: topic.id });
+      if (askModerator) {
+        try {
+          await rpc.call("council/plan-topic", {
+            topicId: topic.id,
+            ...(questions.trim() && { prompt: questions.trim() }),
+          });
+        } catch (e) {
+          refresh();
+          throw Error(
+            l(
+              "Council saved. Retry AI planning in Council actions.",
+              "议题已保存，可在「议题操作」中重试 AI 规划。",
+            ) +
+              " " +
+              (e as Error).message,
+          );
+        }
+      }
     });
   }
   const steps = [
@@ -322,6 +367,7 @@ export function Wizard({
               {l("Project workspace", "项目工作区")}
               <input
                 aria-label={l("Project workspace", "项目工作区")}
+                required={guided}
                 list="althing-project-choices"
                 value={cwd}
                 onChange={(e) => {
@@ -372,6 +418,29 @@ export function Wizard({
                 placeholder={l("Separate with commas", "用逗号分隔")}
               />
             </label>
+            {guided && (
+              <label>
+                {l("How many experts should participate?", "邀请几位专家？")}
+                <select
+                  value={people.length}
+                  onChange={(e) => {
+                    const count = Number(e.target.value);
+                    roster(
+                      Array.from(
+                        { length: count },
+                        (_, i) => people[i] ?? expert(i),
+                      ),
+                    );
+                  }}
+                >
+                  {Array.from(new Set([1, 2, 3, 4, 5, 6, people.length]))
+                    .sort((a, b) => a - b)
+                    .map((n) => (
+                      <option key={n}>{n}</option>
+                    ))}
+                </select>
+              </label>
+            )}
             <label className="full">
               {l("Description", "说明")}
               <textarea
@@ -397,7 +466,14 @@ export function Wizard({
         )}
         {step === 1 && (
           <>
-            {error && <p role="alert">{error}</p>}
+            {guided && (
+              <p>
+                {l(
+                  "Which models should discuss this topic? The first expert also chairs the council unless you select a separate moderator.",
+                  "邀请哪些模型讨论？默认由第一位专家兼任主持人，也可以单独选择主持模型。",
+                )}
+              </p>
+            )}
             {people.map((p, i) => (
               <fieldset key={p.id}>
                 <legend>
@@ -420,7 +496,12 @@ export function Wizard({
                 </button>
               </fieldset>
             ))}
-            <button type="button" onClick={() => roster([...people, blank()])}>
+            <button
+              type="button"
+              onClick={() =>
+                roster([...people, guided ? expert(people.length) : blank()])
+              }
+            >
               + {l("Add expert", "添加专家")}
             </button>
             <label className="check">
@@ -442,7 +523,41 @@ export function Wizard({
             )}
           </>
         )}
-        {step === 2 && (
+        {step === 2 && guided && (
+          <>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={askModerator}
+                onChange={(e) => setAskModerator(e.target.checked)}
+              />
+              {l(
+                "Ask the moderator to propose agendas and sub-agendas",
+                "由主持模型建议议程与子议题",
+              )}
+            </label>
+            {askModerator && (
+              <label>
+                {l(
+                  "Which questions should the moderator consider?",
+                  "希望主持人优先讨论哪些问题？",
+                )}
+                <textarea
+                  rows={4}
+                  value={questions}
+                  onChange={(e) => setQuestions(e.target.value)}
+                />
+                <small>
+                  {l(
+                    "Review the proposed agenda before dispatching experts.",
+                    "可先审阅生成的议程，再派发专家讨论。",
+                  )}
+                </small>
+              </label>
+            )}
+          </>
+        )}
+        {step === 2 && !askModerator && (
           <>
             {agendas.length === 0 && (
               <p className="small">
@@ -554,16 +669,22 @@ export function Wizard({
             </button>
           </>
         )}
+        {error && <p role="alert">{error}</p>}
         <footer className="form-footer">
           {step > 0 && (
             <button type="button" onClick={() => go(step - 1)}>
               {l("Back", "上一步")}
             </button>
           )}
-          <button className="primary" disabled={busy}>
+          <button
+            className="primary"
+            disabled={busy || (guided && step === 1 && people.length === 0)}
+          >
             {step < 2
               ? l("Continue", "下一步")
-              : l("Create council", "创建议题")}
+              : askModerator
+                ? l("Create and plan agenda", "创建并规划议程")
+                : l("Create council", "创建议题")}
           </button>
         </footer>
       </form>

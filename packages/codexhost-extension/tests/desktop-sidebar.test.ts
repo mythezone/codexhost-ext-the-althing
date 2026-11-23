@@ -6,8 +6,31 @@ import { dom, mockUI, eventually, query, fireEvent, wait } from "./ui-host";
 test("Desktop classic entry coexists with thread tree, tracks geometry, yields to navigation and cleans up", async (t) => {
   dom(t);
   const h = mockUI();
+  const original = h.api.backend.invoke.bind(h.api.backend);
+  const cards = (await original(
+    "althing/topics/list",
+  )) as import("../src/frontend/types").Card[];
+  let items = cards.slice(0, 1),
+    cursor = 0;
+  const backend = {
+    invoke: async (method: string, p: any) => {
+      if (method === "althing/topics/list") return items;
+      if (method === "althing/events/since")
+        return {
+          cursor,
+          events: p.cursor < cursor ? [{}] : [],
+          activeRunCount: 0,
+        };
+      return original(method, p);
+    },
+  };
+  function update(next: typeof items) {
+    items = next;
+    cursor++;
+    document.dispatchEvent(new Event("visibilitychange"));
+  }
   document.body.innerHTML =
-    '<aside><div data-app-action-sidebar-scroll><section><button data-app-action-sidebar-project-id="folder-1" data-app-action-sidebar-project-row data-app-action-sidebar-project-collapsed="false" data-app-action-sidebar-project-label="Study">Study</button><div data-codexhost-sidebar-tree-children><button>Existing tree</button></div><button data-app-action-sidebar-thread-row>Thread</button></section></div></aside><nav data-app-navigation-rail><button data-sidebar-destination>Home</button></nav><main>Native chat</main>';
+    '<aside><div data-app-action-sidebar-scroll><section><button data-app-action-sidebar-project-id="folder-1" data-app-action-sidebar-project-row data-app-action-sidebar-project-collapsed="false" data-app-action-sidebar-project-label="Study">Study</button><div data-codexhost-sidebar-tree-children><button>Existing tree</button></div><button data-app-action-sidebar-thread-row><span data-thread-title style="font-size: 12px">Thread</span></button></section><section id="empty"><button data-project-cwd="/empty">Empty</button></section></div></aside><nav data-app-navigation-rail><button data-sidebar-destination>Home</button></nav><main>Native chat</main>';
   const aside = document.querySelector("aside")!,
     foreign = document.querySelector("[data-codexhost-sidebar-tree-children]")!,
     before = foreign.outerHTML;
@@ -32,6 +55,7 @@ test("Desktop classic entry coexists with thread tree, tracks geometry, yields t
   assert.equal(defines, 1);
   const dispose = definition.activate({
     ...h.api,
+    backend,
     assets: { readDataUrl: h.api.assets.readDataUrl },
     dom: {
       mount: (
@@ -68,6 +92,37 @@ test("Desktop classic entry coexists with thread tree, tracks geometry, yields t
     const top = await eventually(() => owned("top"));
     assert.match(top.textContent!, /The Althing1/);
     assert.equal(top.parentElement!.firstElementChild, top);
+    assert.equal(top.style.fontSize, "12px");
+    assert.equal(owned("group")?.style.fontSize, "12px");
+    assert.equal(document.querySelector("#empty [data-althing-owned]"), null);
+    update([{ ...cards[0], status: "completed", activeRunCount: 0 }]);
+    await eventually(() => !owned("top") && owned("group"));
+    for (const cb of h.listeners) cb({ sidebarAlthingVisibility: "always" });
+    await eventually(() => owned("top")?.querySelector("small")?.hidden);
+    update([]);
+    await eventually(() => !owned("group") && owned("top"));
+    for (const cb of h.listeners) cb({ sidebarAlthingVisibility: "hidden" });
+    update([{ ...cards[0], status: "in_progress", activeRunCount: 0 }]);
+    await eventually(() => !owned("top") && owned("group"));
+    for (const cb of h.listeners) cb({});
+    await eventually(() => owned("top"));
+    update(cards.slice(0, 1));
+    const composer = document.createElement("form");
+    composer.setAttribute("data-codex-composer-root", "");
+    composer.innerHTML = "<textarea></textarea>";
+    document.body.append(composer);
+    const prompt = composer.querySelector("textarea")!;
+    prompt.value = "/althing Desktop meeting";
+    fireEvent.keyDown(prompt, { key: "Enter" });
+    const commandOverlay = await eventually(() => owned("overlay"));
+    await eventually(
+      () =>
+        (query(commandOverlay).getByLabelText("Title") as HTMLInputElement)
+          .value === "Desktop meeting",
+    );
+    fireEvent.click(document.querySelector("[data-sidebar-destination]")!);
+    await eventually(() => !owned("overlay"));
+    composer.remove();
     fireEvent.click(await eventually(() => owned("group-header")));
     await eventually(() => owned("topic"));
     assert.equal(

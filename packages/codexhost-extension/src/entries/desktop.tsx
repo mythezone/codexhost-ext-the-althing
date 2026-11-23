@@ -1,3 +1,4 @@
+import { installCouncilCommand } from "./composer-command";
 import { mountWorkspace } from "../frontend/App";
 import {
   listenAppearance,
@@ -67,7 +68,8 @@ function icon() {
 function activate(api: Desktop) {
   const ctrl = new AbortController(),
     rpc = new RpcClient(api.backend, ctrl.signal);
-  let groupsEnabled = true,
+  let topVisibility: "active" | "always" | "hidden" = "active",
+    groupsEnabled = true,
     english = true,
     rows: readonly Row[] = [],
     cards: Card[] = [],
@@ -163,9 +165,21 @@ function activate(api: Desktop) {
       groups.clear();
       return;
     }
-    if (top.parentElement !== parent) api.dom.mount(top, parent, "prepend");
     const title = translate("The Althing", "议事厅"),
       n = cards.filter(activeCouncil).length;
+    const nativeLabel =
+      parent.querySelector("[data-thread-title]") ||
+      parent.querySelector(rowSelector) ||
+      parent.querySelector(
+        "[data-app-action-sidebar-project-row],[data-sidebar-destination]",
+      );
+    const fontSize = nativeLabel
+      ? window.getComputedStyle(nativeLabel).fontSize
+      : "";
+    if (topVisibility === "always" || (topVisibility === "active" && n > 0)) {
+      if (top.style.fontSize !== fontSize) top.style.fontSize = fontSize;
+      if (top.parentElement !== parent) api.dom.mount(top, parent, "prepend");
+    } else top.remove();
     if (topText.textContent !== title) topText.textContent = title;
     if (pill.hidden !== !n) pill.hidden = !n;
     if (pill.textContent !== String(n)) pill.textContent = String(n);
@@ -273,20 +287,17 @@ function activate(api: Desktop) {
         });
     }
     known = [...catalog.values()];
-    for (const [anchor, g] of groups)
-      if (!groupsEnabled || !candidates.has(anchor) || !g.box.isConnected) {
-        g.box.remove();
-        groups.delete(anchor);
-      }
-    if (!groupsEnabled) return;
-    const seen = new Set<string>();
+    const visible = new Set<Element>(),
+      seen = new Set<string>();
     for (const [anchor, p] of candidates) {
-      if (seen.has(p.cwd)) continue;
-      seen.add(p.cwd);
-      const topics = cards.filter(
-          (c) => workspaceKey(c.projectCwd) === workspaceKey(p.cwd),
-        ),
-        isOpen = expanded.get(p.cwd) ?? saved(p.cwd);
+      if (!groupsEnabled) break;
+      const key = workspaceKey(p.cwd);
+      if (seen.has(key)) continue;
+      const topics = cards.filter((c) => workspaceKey(c.projectCwd) === key);
+      if (!topics.length) continue;
+      seen.add(key);
+      visible.add(anchor);
+      const isOpen = expanded.get(p.cwd) ?? saved(p.cwd);
       const signature = JSON.stringify([
         p.cwd,
         isOpen,
@@ -300,8 +311,7 @@ function activate(api: Desktop) {
         ]),
       ]);
       let g = groups.get(anchor);
-      if (g?.signature === signature) continue;
-      if (!g) {
+      if (!g?.box.isConnected) {
         const box = element("div", "group");
         api.dom.mount(
           box,
@@ -316,6 +326,8 @@ function activate(api: Desktop) {
         g = { box, signature: "" };
         groups.set(anchor, g);
       }
+      if (g.box.style.fontSize !== fontSize) g.box.style.fontSize = fontSize;
+      if (g.signature === signature) continue;
       g.signature = signature;
       const header = element("button", "group-header");
       header.setAttribute("aria-expanded", String(isOpen));
@@ -350,6 +362,12 @@ function activate(api: Desktop) {
         create.textContent = "+ " + translate("New Council", "新建议题");
         create.onclick = () => open({ newCouncil: true, projectCwd: p.cwd });
         g.box.append(create);
+      }
+    }
+    for (const [anchor, g] of groups) {
+      if (!visible.has(anchor)) {
+        g.box.remove();
+        groups.delete(anchor);
       }
     }
   }
@@ -389,6 +407,10 @@ function activate(api: Desktop) {
       "data-app-action-sidebar-section-collapsed",
     ],
   });
+  const offCommand = installCouncilCommand(
+    (commandTopic) => open({ newCouncil: true, commandTopic }),
+    () => translate("Start a council", "发起会议"),
+  );
   const offRows = api.sidebar.observeRows((r) => {
     rows = r;
     schedule();
@@ -400,6 +422,11 @@ function activate(api: Desktop) {
   let settingsChanged = false;
   const settings = (s: Record<string, unknown>) => {
     groupsEnabled = s.showProjectAlthingItems !== false;
+    topVisibility =
+      s.sidebarAlthingVisibility === "always" ||
+      s.sidebarAlthingVisibility === "hidden"
+        ? s.sidebarAlthingVisibility
+        : "active";
     schedule();
   };
   const offSettings = api.storage.onChange((s) => {
@@ -481,6 +508,7 @@ function activate(api: Desktop) {
     close();
     cancelAnimationFrame(frame);
     mutations.disconnect();
+    offCommand();
     offRows();
     offSettings();
     offAppearance();

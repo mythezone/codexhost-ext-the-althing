@@ -23,6 +23,7 @@ export function dom(t: TestContext) {
     "Element",
     "Node",
     "HTMLInputElement",
+    "HTMLTextAreaElement",
     "Event",
     "CustomEvent",
     "MouseEvent",

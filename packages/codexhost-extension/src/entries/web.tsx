@@ -1,3 +1,4 @@
+import { installCouncilCommand } from "./composer-command";
 import { mountWorkspace } from "./page";
 import type { HostApi } from "../frontend/host";
 type Panel = {
@@ -8,6 +9,11 @@ type Panel = {
 };
 export async function activate(
   api: HostApi & {
+    dom?: {
+      mount(
+        parent: HTMLElement,
+      ): { container: HTMLElement; dispose(): void } | undefined;
+    };
     panels: { register: (panel: Panel) => () => void };
     track: (fn: () => void) => void;
   },
@@ -31,11 +37,42 @@ export async function activate(
       return close;
     },
   });
+  let closeCommand: (() => void) | undefined;
+  const offCommand =
+    api.dom &&
+    installCouncilCommand(
+      (commandTopic) => {
+        if (closeCommand) return;
+        const mount = api.dom!.mount(document.body);
+        if (!mount) return;
+        mount.container.dataset.althingWebWorkspace = "";
+        const close = () => {
+          unmount();
+          mount.dispose();
+          closeCommand = undefined;
+        };
+        const unmount = mountWorkspace(mount.container, api, {
+          initial: { newCouncil: true, commandTopic },
+          close,
+        });
+        closeCommand = close;
+      },
+      () =>
+        (
+          api.locale ||
+          document.documentElement.lang ||
+          navigator.language
+        ).startsWith("zh")
+          ? "发起会议"
+          : "Start a council",
+    );
   let disposed = false;
   function dispose() {
     if (disposed) return;
     disposed = true;
     for (const close of active) close();
+    offCommand?.();
+    closeCommand?.();
     unregister();
     api.signal.removeEventListener("abort", dispose);
   }

@@ -21,7 +21,9 @@ The build writes a self-contained extension to `dist/`. For backend-only develop
 
 ## Local installation
 
-Open the CodexHost plugin center, import a local directory using `localDir`, select this package’s absolute `dist/` path (the directory containing `manifest.json`), and enable **The Althing / 议事厅**. Rebuild and update the local installation after changing code. On Desktop, open the top-level sidebar item or expand a project's council group. On Web, select The Althing in the main navigation.
+Open the CodexHost plugin center, import a local directory using `localDir`, select this package’s absolute `dist/` path (the directory containing `manifest.json`), and enable **The Althing / 议事厅**. Rebuild and update the local installation after changing code. Desktop shows council groups under projects that have at least one topic. Its top-level sidebar entry appears during active discussions or moderator work. Set **Top-level Desktop sidebar entry** to always show or always hide it in extension settings. On Web, select The Althing in the main navigation.
+
+In the Desktop or Web chat composer, type `/althing` or `/althing Meeting topic` and press Enter, or choose the extension's **Start a council** suggestion. Select a workspace, the number of experts, their harnesses and models, and any questions for the moderator. By default the first expert's model chairs the meeting. You can select a separate moderator or enter the agenda manually. **Create and plan agenda** saves the council and delegates planning to the chosen moderator. Review the proposed sub-agendas before dispatching a round. The extension provides this shortcut and the meeting workflow upon activation.
 
 The wizard combines configured projects, the default workspace and recent thread directories. The Desktop sidebar can supply additional project paths. Choose a local absolute workspace for delegation. Harness, model and thinking options come from the Host. Theme and sidebar settings are available in the plugin center.
 

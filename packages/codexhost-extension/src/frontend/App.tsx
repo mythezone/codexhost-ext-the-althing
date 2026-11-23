@@ -424,7 +424,15 @@ function App({
               />
             )}
             {wizard && settingsReady && (
-              <Wizard cwd={cwd} close={() => show(false)} />
+              <Wizard
+                key={dest.commandTopic}
+                cwd={cwd}
+                commandTopic={dest.newCouncil ? dest.commandTopic : undefined}
+                close={() => {
+                  show(false);
+                  if (dest.newCouncil) go({ projectCwd: cwd });
+                }}
+              />
             )}
           </div>
         </WorkspaceContext.Provider>

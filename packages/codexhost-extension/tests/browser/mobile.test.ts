@@ -31,6 +31,7 @@ async function openWebPanel(page: Page) {
       const signal = new AbortController().signal;
       await activate({signal,locale:'en',assets:{url:p=>'/'+p},backend:{invoke:window.invoke},
         storage:{get:async()=>({}),onChange:()=>()=>{}},track(){},
+        dom:{mount(parent){const container=document.createElement('div');parent.append(container);return {container,dispose:()=>container.remove()}}},
         panels:{register(panel){panel.render(document.querySelector('main'),signal);return ()=>{}}}});
       </script>`,
     });
@@ -637,4 +638,51 @@ for (const engine of [chromium, webkit]) {
       },
     );
   }
+}
+
+for (const engine of [chromium, webkit]) {
+  test(
+    engine.name() +
+      " mobile chat opens a council by slash hint or Enter and consumes only the command",
+    async (t) => {
+      const browser = await engine.launch();
+      t.after(() => browser.close());
+      const page = await browser.newPage({
+        viewport: { width: 375, height: 812 },
+        isMobile: true,
+        hasTouch: true,
+      });
+      await page.exposeFunction("invoke", mockUI().api.backend.invoke);
+      await openWebPanel(page);
+      await page.locator(".althing-ext-root").waitFor();
+      await page.evaluate(() => {
+        const host = document.querySelector("header")!;
+        host.dataset.composerCard = "";
+        host.innerHTML =
+          '<div contenteditable="true" role="textbox" data-composer-input></div>';
+      });
+      const editor = page.locator("[data-composer-input]");
+      const workspace = page.locator("[data-althing-web-workspace]");
+      for (const mode of ["hint", "enter"]) {
+        const subject = mode === "enter" ? "通勤研究" : "";
+        await editor.fill(mode === "hint" ? "/alt" : "/althing " + subject);
+        if (mode === "hint")
+          await page.getByRole("button", { name: /\/althing/ }).tap();
+        else await editor.press("Enter");
+        await workspace.getByRole("dialog").waitFor();
+        assert.equal(
+          await workspace.getByLabel("Title", { exact: true }).inputValue(),
+          subject,
+        );
+        assert.equal((await editor.innerText()).trim(), "");
+        const bounds = await workspace
+          .locator(".althing-ext-root")
+          .evaluate(measureBounds, 375);
+        assert.deepEqual(bounds.problems, []);
+        await workspace.getByLabel("Close", { exact: true }).tap();
+        await workspace.getByRole("button", { name: "Back to chat" }).tap();
+        await workspace.waitFor({ state: "detached" });
+      }
+    },
+  );
 }

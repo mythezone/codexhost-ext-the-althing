@@ -15,6 +15,7 @@ export type Destination = {
   topicId?: string;
   projectCwd?: string;
   newCouncil?: boolean;
+  commandTopic?: string;
   tab?: string;
   sub?: string;
   reportId?: string;

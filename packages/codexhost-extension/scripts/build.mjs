@@ -55,6 +55,7 @@ async function frontend(output) {
       minify: true,
     })
   ).code;
+  const commandCss = await readFile("src/entries/composer.css", "utf8");
   for (const target of ["page", "web", "desktop"]) {
     const dir = output + "/" + target,
       desktop = target === "desktop";
@@ -88,7 +89,7 @@ async function frontend(output) {
             ]
           : [],
     });
-    await writeFile(dir + "/style.css", desktop ? native : css);
+    await writeFile(dir + "/style.css", (desktop ? native : css) + (target === "page" ? "" : commandCss));
   }
 }
 async function notices(output) {

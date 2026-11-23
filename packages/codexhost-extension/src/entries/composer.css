@@ -1,0 +1,21 @@
+button[data-althing-command] {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 4px 8px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  padding: 3px 9px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-sm, 13px);
+  cursor: pointer;
+}
+
+[data-althing-web-workspace] {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  isolation: isolate;
+}

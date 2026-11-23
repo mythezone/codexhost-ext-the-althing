@@ -25,8 +25,9 @@ button[data-althing-owned] {
 button[data-althing-owned]:hover {
   background: var(--color-token-list-hover, rgba(128, 128, 128, 0.14));
 }
-[data-althing-owned="top"] {
-  font-weight: 600 !important;
+button[data-althing-owned="top"],
+[data-althing-owned="group"] {
+  font-size: var(--text-sm, 13px);
 }
 [data-althing-owned="top"] small:not([hidden]) {
   border-radius: 10px;
