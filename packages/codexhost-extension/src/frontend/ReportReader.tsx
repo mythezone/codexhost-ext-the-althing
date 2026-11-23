@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useL, useWorkspace } from "./context";
+import { reportDocument } from "../shared/report-document";
 import { Modal } from "./ui";
 import { saveBlob } from "./rpc-client";
 import type { Report } from "./types";
@@ -31,14 +32,15 @@ export function ReportReader({
       live = false;
     };
   }, [rpc, topicId, id]);
-  // Only the generated report document receives the initial appearance.
-  const html = report?.html_content?.replace(
-    /<html\b/i,
-    scheme === "dark" ? "<html data-dark" : "<html",
+  const html = useMemo(
+    () =>
+      report?.html_content &&
+      reportDocument(report.html_content, scheme === "dark"),
+    [report?.html_content, scheme],
   );
   return (
     <Modal title={report?.title || l("Report", "报告")} close={close} wide>
-      <div className="tools">
+      <div className="tools report-tools">
         <button
           disabled={!html}
           onClick={() =>

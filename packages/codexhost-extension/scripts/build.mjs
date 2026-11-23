@@ -25,9 +25,6 @@ async function backend(output) {
 async function frontend(output) {
   const sources = [
     "style",
-    "venue",
-    "return-portal",
-    "venue-plaque",
     "topic-navigation",
     "discussion",
     "reader",
@@ -36,6 +33,8 @@ async function frontend(output) {
   const styles = await Promise.all(
     sources.map((name) => readFile("src/frontend/" + name + ".css", "utf8")),
   );
+  const { tableCss } = JSON.parse(await readFile("src/backend/domain/publication.json", "utf8"));
+  styles.push(tableCss);
   const root = ".althing-ext-root";
   const scoped = await postcss([
     prefix({

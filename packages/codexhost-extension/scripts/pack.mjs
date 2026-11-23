@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir, readdir, lstat } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rm, readdir, lstat } from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { writeZip } from "../src/backend/domain/zip.ts";
@@ -59,6 +59,7 @@ files.set(
     ) + "\n",
   ),
 );
+await rm(out, { recursive: true, force: true });
 await mkdir(out, { recursive: true });
 for (const [name, bytes] of files) await writeFile(path.join(out, name), bytes);
 await writeFile(

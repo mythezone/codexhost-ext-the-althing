@@ -1,6 +1,6 @@
 # The Althing · 议事厅
 
-A CodexHost v2 extension for running multi-agent research councils. Choose a project and expert panel, follow rounds in the interactive venue or reading view, then export the report and archive.
+A CodexHost v2 extension for running multi-agent research councils. Choose a project and expert panel, read agenda conclusions and follow discussions by round, then export the report and archive.
 
 ## Install and update
 

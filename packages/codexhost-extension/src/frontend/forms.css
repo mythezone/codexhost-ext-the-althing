@@ -29,7 +29,6 @@ legend {font-weight:750;padding-inline:5px}
 .run-card p {white-space:pre-wrap;overflow-wrap:anywhere}
 .run-card .status.running {background:var(--live-fill);color:var(--blue-ink)}
 .run-card .status.failed,.problem {color:var(--ink);background:var(--peach);padding:6px 12px}
-.report-frame {height:68vh;width:100%;border:0;background:white}
 [aria-pressed=true]:not(.chosen) {border-color:var(--primary)}
 @media (max-width:760px) {
   .controls { grid-template-columns: minmax(0,1fr); }

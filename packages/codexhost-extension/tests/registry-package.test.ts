@@ -40,8 +40,8 @@ test("the four marketplace screenshots ship byte-for-byte in the release and che
   const manifest = JSON.parse(files.get("manifest.json")!.toString());
   const names = [
     "hub.webp",
-    "venue-lobby.webp",
-    "venue-roundtable.webp",
+    "overview.webp",
+    "discussion.webp",
     "report-reader.webp",
   ];
   assert.deepEqual(

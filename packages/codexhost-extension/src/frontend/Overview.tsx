@@ -1,9 +1,16 @@
+import { useSyncExternalStore } from "react";
 import { ArrowRight, ChevronRight, Users } from "lucide-react";
 import { CouncilIcon } from "./CouncilIcon";
 import { Markdown, Meter, Points, Status } from "./ui";
 import { useAssets, useL, useWorkspace } from "./context";
 import { Roster } from "./plugins/builtins";
 import type { Topic } from "./types";
+const narrow = "(max-width: 760px)";
+function watchWidth(change: () => void) {
+  const media = window.matchMedia(narrow);
+  media.addEventListener("change", change);
+  return () => media.removeEventListener("change", change);
+}
 type OpenReport = (id: string) => void;
 const reportButton = (id: string | null, open: OpenReport, label: string) =>
   id && (
@@ -25,6 +32,10 @@ export function Overview({
   const l = useL(),
     assets = useAssets(),
     { rpc, perform } = useWorkspace();
+  const compact = useSyncExternalStore(
+    watchWidth,
+    () => window.matchMedia(narrow).matches,
+  );
   const finished = ["completed", "archived"].includes(t.status);
   return (
     <div className="overview">
@@ -80,7 +91,7 @@ export function Overview({
               size={29}
             />
             {finished
-              ? l("Agenda conclusions", "议程结论矩阵")
+              ? l("Agenda conclusions", "议程结论")
               : l("Agenda progress", "议程进展")}
           </h2>
           <span>
@@ -92,9 +103,42 @@ export function Overview({
             {l("Waiting for the first agenda.", "等待主持人发布议程。")}
           </p>
         )}
-        {finished ? (
-          <div className="table-wrap">
-            <table aria-label={l("Agenda conclusions", "议程结论矩阵")}>
+        {finished && compact ? (
+          <ul className="conclusion-cards">
+            {t.agendas.map((a) => (
+              <li key={a.id}>
+                <h3>
+                  <button className="text-button" onClick={() => select(a.id)}>
+                    {a.code} · {a.title}
+                    <ChevronRight size={15} />
+                  </button>
+                </h3>
+                <div>
+                  <h4>{l("Conclusions and findings", "结论与要点")}</h4>
+                  <Markdown text={a.conclusion_summary} />
+                  <Points items={a.conclusion_key_points} />
+                </div>
+                {!!a.open_disagreements.length && (
+                  <div>
+                    <h4>{l("Open disagreements", "未决分歧")}</h4>
+                    <Points items={a.open_disagreements} />
+                  </div>
+                )}
+                {reportButton(a.report_id, open, l("Read report", "阅读报告"))}
+              </li>
+            ))}
+          </ul>
+        ) : finished ? (
+          <div
+            className="table-scroll"
+            role="region"
+            aria-label={l("Agenda conclusions", "议程结论")}
+            tabIndex={0}
+          >
+            <table
+              className="conclusion-matrix"
+              aria-label={l("Agenda conclusions", "议程结论")}
+            >
               <thead>
                 <tr>
                   <th>{l("Agenda", "议程")}</th>

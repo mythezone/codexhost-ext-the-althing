@@ -1,19 +1,10 @@
 import { useL, useWorkspace } from "./context";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import {
-  ArrowLeft,
-  BookOpen,
-  ChevronDown,
-  DoorOpen,
-  ScrollText,
-  UsersRound,
-} from "lucide-react";
+import { ArrowLeft, ChevronDown, ScrollText, UsersRound } from "lucide-react";
 import { CouncilIcon } from "./CouncilIcon";
 import { Status } from "./ui";
 import { plugins } from "./plugins/registry";
 import type { Topic } from "./types";
-
-export type MeetingView = "venue" | "reading";
 
 function TempleMark() {
   return (
@@ -80,18 +71,14 @@ function ProgressDial({ value }: { value: number }) {
 type Props = {
   topic: Topic;
   tab: string;
-  view: MeetingView;
   onSelect: (id: string) => void;
-  onView: (view: MeetingView) => void;
   actions: ReactNode;
 };
 
 export default function TopicNavigation({
   topic: t,
   tab,
-  view,
   onSelect,
-  onView,
   actions,
 }: Props) {
   const l = useL();
@@ -224,26 +211,6 @@ export default function TopicNavigation({
             ),
           )}
         </nav>
-        <div
-          className="council-view-switch"
-          role="group"
-          aria-label={l("Workspace view", "议题浏览方式")}
-        >
-          <button
-            aria-pressed={view === "venue"}
-            onClick={() => onView("venue")}
-          >
-            <DoorOpen size={16} />
-            {l("Venue view", "会场模式")}
-          </button>
-          <button
-            aria-pressed={view === "reading"}
-            onClick={() => onView("reading")}
-          >
-            <BookOpen size={16} />
-            {l("Reading view", "阅读模式")}
-          </button>
-        </div>
       </div>
     </header>
   );

@@ -6,6 +6,7 @@ import {
   serialize,
   type DefaultTreeAdapterTypes as P,
 } from "parse5";
+import { reportDocument } from "../../shared/report-document.ts";
 import assets from "./publication.json" with { type: "json" };
 import type { Report, Topic, SubAgenda } from "./models.ts";
 
@@ -61,6 +62,9 @@ function page(title: string, body: string, script = controls) {
     escape(title) +
     "</title><style>" +
     assets.css +
+    "</style><style data-althing-mobile-tables>" +
+    assets.tableCss +
+    assets.readerCss +
     "</style></head><body><header><strong>" +
     book +
     "The Althing</strong><button data-mode>明暗模式</button><button data-print>打印 / PDF</button></header><main>" +
@@ -77,6 +81,12 @@ function md(source: string, headings?: string[]) {
     const tag = node.tagName,
       inner = node.childNodes.map(clean).join("");
     if (!allowed.has(tag)) return inner;
+    if (tag === "table")
+      return (
+        '<div class="table-scroll" role="region" tabindex="0"><table>' +
+        inner +
+        "</table></div>"
+      );
     let attrs = "";
     if (tag === "a") {
       const href = node.attrs.find((a) => a.name === "href")?.value ?? "";
@@ -239,7 +249,9 @@ export function offlineView(t: Topic, { embedReports = false } = {}) {
     '<p><a href="' +
     (embedReports
       ? "data:text/html;base64," +
-        Buffer.from(r.html_content ?? "").toString("base64") +
+        Buffer.from(reportDocument(r.html_content ?? "", false)).toString(
+          "base64",
+        ) +
         '" download="' +
         escape(r.id) +
         ".html"

@@ -1,8 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import type { Topic } from "./types";
 import { useL, useWorkspace } from "./context";
-import TopicNavigation, { type MeetingView } from "./TopicNavigation";
-import CouncilVenue from "./CouncilVenue";
+import TopicNavigation from "./TopicNavigation";
 import { Discussion, type Target } from "./Discussion";
 import { DispatchDialog, QuickEdit, Runs } from "./Controls";
 import { ReportReader } from "./ReportReader";
@@ -21,15 +20,6 @@ export function TopicPage({
   const l = useL(),
     { rpc, busy, perform } = useWorkspace(),
     root = useRef<HTMLElement>(null),
-    [view, setView] = useState<MeetingView>(() => {
-      try {
-        return localStorage.getItem("althing.meeting-view") === "reading"
-          ? "reading"
-          : "venue";
-      } catch {
-        return "venue";
-      }
-    }),
     [tab, setTab] = useState(initial.tab || "overview"),
     [subId, setSub] = useState(initial.sub || ""),
     [dialog, show] = useState(""),
@@ -74,15 +64,7 @@ export function TopicPage({
     <main className="topic-body" ref={root}>
       <TopicNavigation
         topic={t}
-        view={view}
         tab={tab}
-        onView={(v) => {
-          setView(v);
-          try {
-            localStorage.setItem("althing.meeting-view", v);
-          } catch {}
-          if (tab === "final" || Extra) pick("overview");
-        }}
         onSelect={(id) => pick(id)}
         actions={
           <>
@@ -135,15 +117,6 @@ export function TopicPage({
           </>
         }
       />
-      {view === "venue" && !["final", "plugin:roster"].includes(tab) && (
-        <CouncilVenue
-          topic={t}
-          agenda={a}
-          sub={s}
-          onEnter={pick}
-          onLobby={() => pick("overview")}
-        />
-      )}
       {tab === "overview" && (
         <>
           <section className="panel">
@@ -172,16 +145,7 @@ export function TopicPage({
               </div>
             )}
           </section>
-          {view === "reading" ? (
-            <Overview topic={t} select={pick} open={setReport} />
-          ) : (
-            <details className="meeting-records">
-              <summary>
-                {l("Agenda progress and minutes", "议程进展与会议记录")}
-              </summary>
-              <Overview topic={t} select={pick} open={setReport} />
-            </details>
-          )}
+          <Overview topic={t} select={pick} open={setReport} />
         </>
       )}
       {a && (

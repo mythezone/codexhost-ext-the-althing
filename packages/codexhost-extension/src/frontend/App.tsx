@@ -41,11 +41,6 @@ const art = [
   "research",
   "report",
   "winged-book",
-  "portrait-apollo",
-  "portrait-athena",
-  "portrait-hermes",
-  "venue-garden",
-  "venue-olympus",
 ].map((n) => n + ".webp");
 
 function App({

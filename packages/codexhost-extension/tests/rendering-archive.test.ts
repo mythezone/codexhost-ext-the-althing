@@ -263,3 +263,63 @@ test("restored run history links to new resources and an in-flight source turn r
   assert.equal(host.panelist_threads.p1.threadId, null);
   assert.equal((await store.list())[0].activeRunCount, 0);
 });
+
+test("report and offline Markdown tables are focusable scroll regions", () => {
+  const c = councilFixture();
+  const markdown = "| Site | Observation |\n| --- | --- |\n| South | Review |";
+  const report = c.create(
+    "report",
+    { title: "Survey", markdown_content: markdown },
+    "study",
+  );
+  c.patch("topic", "study", { description: markdown });
+  for (const html of [report.html_content!, offlineView(hydrate(c.tree))]) {
+    assert.ok(
+      html.includes(
+        '<div class="table-scroll" role="region" tabindex="0"><table>',
+      ),
+    );
+    assert.ok(html.includes("data-althing-mobile-tables"));
+  }
+});
+
+test("legacy layout upgrade preserves scripts, author srcdoc, CSP and existing regions byte-for-byte", async () => {
+  const { reportDocument } = await import("../src/shared/report-document");
+  const script =
+    'const sample = "<table></table></head>";\r\n// original bytes';
+  const hash = createHash("sha256").update(script).digest("base64");
+  const embedded =
+    '<iframe sandbox="allow-scripts" srcdoc="&lt;table>&lt;/table>"></iframe>';
+  const source =
+    '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="script-src ' +
+    "'sha256-" +
+    hash +
+    "'\"></head><body><!-- <table> -->" +
+    embedded +
+    "<TABLE><tr><td>旧报告</td></tr></TABLE><script>" +
+    script +
+    "</script></body></html>";
+  const html = reportDocument(source, true);
+  assert.ok(html.includes("<html data-dark>"));
+  assert.ok(html.includes(embedded));
+  assert.ok(html.includes("<script>" + script + "</script>"));
+  assert.ok(html.includes("'sha256-" + hash + "'"));
+  assert.equal(html.match(/role="region"/g)?.length, 1);
+  assert.equal(reportDocument(html, true), html);
+  const c = councilFixture();
+  const r = c.create(
+    "report",
+    { title: "Stored", markdown_content: "Report" },
+    "study",
+  );
+  const tree = hydrate(c.tree, true);
+  tree.reports[0].html_content = source;
+  const offline = exportStandaloneHtml(tree).toString();
+  const embeddedReport = offline.match(/data:text\/html;base64,([^"]+)"/)![1];
+  assert.equal(
+    Buffer.from(embeddedReport, "base64").toString(),
+    reportDocument(source, false),
+  );
+  assert.equal(tree.reports[0].id, r.id);
+  assert.equal(tree.reports[0].html_content, source);
+});

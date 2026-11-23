@@ -9,8 +9,7 @@
 .council-activity-row,
 .council-dial,
 .council-navigation,
-.council-nav,
-.council-view-switch {
+.council-nav {
   display: flex;
   align-items: center;
 }
@@ -233,28 +232,6 @@ button.council-activity {
   border-radius: 7px;
   font-size: 0.78rem;
 }
-.council-view-switch {
-  gap: 2px;
-  border: 1px solid var(--line);
-  background: var(--soft);
-  padding: 2px;
-  border-radius: 11px;
-  margin-bottom: 5px;
-}
-.council-view-switch button {
-  min-height: 30px;
-  padding: 4px 8px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-.council-view-switch button[aria-pressed="true"] {
-  color: var(--ink);
-  background: var(--card);
-  border-color: var(--line);
-  box-shadow: 0 1px 3px var(--shadow);
-}
 .council-sub-picker {
   grid-column: 1 / -1;
   display: flex;
@@ -276,16 +253,6 @@ button.council-activity {
   color: var(--ink);
   background: var(--card);
   font: inherit;
-}
-.meeting-records {
-  margin-top: 16px;
-}
-.meeting-records > summary {
-  cursor: pointer;
-  color: var(--primary);
-  font-size: 1rem;
-  font-weight: 750;
-  padding: 10px 0;
 }
 @media (max-width: 760px) {
   .council-head {
@@ -318,11 +285,6 @@ button.council-activity {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
   }
-  .council-view-switch {
-    grid-row: 1;
-    justify-self: end;
-    margin: 0;
-  }
   .council-agenda-list {
     left: max(-62px, -18vw);
     width: min(86vw, 460px);
@@ -342,9 +304,6 @@ button.council-activity {
   .council-nav-link:first-child > svg {
     width: 24px;
   }
-  .council-view-switch button {
-    min-height: 28px;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   .dial-fill {
@@ -358,8 +317,7 @@ button.council-activity {
 @media print {
   .council-breadcrumb,
   .council-navigation,
-  .council-sub-picker,
-  .meeting-records > summary {
+  .council-sub-picker {
     display: none;
   }
   .council-head {

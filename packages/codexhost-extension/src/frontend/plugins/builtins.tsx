@@ -8,7 +8,12 @@ import { Markdown } from "../ui";
 export function Roster({ people }: { people: Expert[] }) {
   const l = useL();
   return (
-    <div className="table-wrap">
+    <div
+      className="table-scroll"
+      role="region"
+      aria-label={l("Expert roster", "专家名册")}
+      tabIndex={0}
+    >
       <table
         className="roster-table"
         aria-label={l("Expert roster", "专家名册")}

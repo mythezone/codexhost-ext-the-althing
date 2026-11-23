@@ -128,7 +128,7 @@ test("New Council wizard uses workspace, advertised fast model, supported thinki
     dispose();
   }
 });
-test("venue and reading view, dispatch, run controls, report sandbox, archive import and export", async (t) => {
+test("reading overview, dispatch, run controls, report sandbox, archive import and export", async (t) => {
   dom(t);
   const h = mockUI(),
     root = document.createElement("div");
@@ -143,22 +143,18 @@ test("venue and reading view, dispatch, run controls, report sandbox, archive im
     await eventually(() =>
       h.calls.some((x) => x.method === "archives/import-commit"),
     );
-    const door = await eventually(() =>
-      ui.getByRole("button", { name: /Enter .*Replication/ }),
+    await eventually(() => ui.getByRole("heading", { name: "Council brief" }));
+    assert.equal(ui.queryByRole("button", { name: "Venue view" }), null);
+    fireEvent.click(
+      await eventually(() =>
+        root.firstElementChild?.shadowRoot?.querySelector(".agenda-link"),
+      ),
     );
-    fireEvent.click(door);
-    await eventually(() =>
-      ui.getByRole("button", { name: "View contributions from One" }),
+    fireEvent.click(
+      await eventually(() =>
+        ui.getByRole("button", { name: "Dispatch round" }),
+      ),
     );
-    assert.ok(
-      root.firstElementChild!.shadowRoot!.querySelector(".venue-seat.thinking"),
-    );
-    fireEvent.click(ui.getByRole("button", { name: "Reading view" }));
-    await eventually(
-      () =>
-        !root.firstElementChild!.shadowRoot!.querySelector(".council-venue"),
-    );
-    fireEvent.click(ui.getByRole("button", { name: "Dispatch round" }));
     const dialog = within(await eventually(() => ui.getByRole("dialog")));
     fireEvent.change(dialog.getByLabelText("Round type"), {
       target: { value: "critique" },
@@ -262,7 +258,7 @@ test("built page dispatches through the built backend and receives completed con
     );
     fireEvent.click(
       await eventually(() =>
-        ui.getByRole("button", { name: /Enter .*Replication/ }),
+        root.firstElementChild?.shadowRoot?.querySelector(".agenda-link"),
       ),
     );
     fireEvent.click(

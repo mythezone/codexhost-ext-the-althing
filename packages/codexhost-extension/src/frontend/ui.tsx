@@ -8,6 +8,50 @@ import { Check, ChevronDown, Circle, Package, X } from "lucide-react";
 export function Markdown({ text }: { text?: string }) {
   if (!text) return null;
   const html = marked.parse(text, { async: false, gfm: true }) as string;
+  const clean = DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [
+      "p",
+      "br",
+      "hr",
+      "strong",
+      "em",
+      "del",
+      "ul",
+      "ol",
+      "li",
+      "blockquote",
+      "pre",
+      "code",
+      "a",
+      "table",
+      "thead",
+      "tbody",
+      "tr",
+      "th",
+      "td",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "details",
+      "summary",
+      "sup",
+      "sub",
+    ],
+    ALLOWED_ATTR: ["href", "title", "start", "align"],
+    ALLOW_DATA_ATTR: false,
+    RETURN_DOM: true,
+  });
+  for (const table of clean.querySelectorAll("table")) {
+    const region = clean.ownerDocument.createElement("div");
+    region.className = "table-scroll";
+    region.setAttribute("role", "region");
+    region.tabIndex = 0;
+    table.replaceWith(region);
+    region.append(table);
+  }
   return (
     <div
       className="prose"
@@ -20,41 +64,7 @@ export function Markdown({ text }: { text?: string }) {
         }
       }}
       dangerouslySetInnerHTML={{
-        __html: DOMPurify.sanitize(html, {
-          ALLOWED_TAGS: [
-            "p",
-            "br",
-            "hr",
-            "strong",
-            "em",
-            "del",
-            "ul",
-            "ol",
-            "li",
-            "blockquote",
-            "pre",
-            "code",
-            "a",
-            "table",
-            "thead",
-            "tbody",
-            "tr",
-            "th",
-            "td",
-            "h1",
-            "h2",
-            "h3",
-            "h4",
-            "h5",
-            "h6",
-            "details",
-            "summary",
-            "sup",
-            "sub",
-          ],
-          ALLOWED_ATTR: ["href", "title", "start", "align"],
-          ALLOW_DATA_ATTR: false,
-        }),
+        __html: clean.innerHTML,
       }}
     />
   );

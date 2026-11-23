@@ -1,6 +1,6 @@
 # The Althing for CodexHost
 
-The Althing brings project-based expert councils to CodexHost Desktop and Web. Choose a project and model roster, dispatch rounds, follow the council in the illustrated venue or reading view, and publish and archive its conclusions.
+The Althing brings project-based expert councils to CodexHost Desktop and Web. Choose a project and model roster, dispatch rounds, read agenda conclusions and follow each discussion, and publish and archive its conclusions.
 
 ## Build and verify
 
@@ -15,9 +15,9 @@ npm run validate:registry
 npm test
 ```
 
-To run the mobile touch regression, run `npx playwright-core install chromium` once, then `npm run test:mobile`. It opens the built Web panel in headless Chromium and checks scrolling, narrow-screen controls, rotation, and the council wizard inside a height-constrained host.
+To run the mobile touch regression, run `npx playwright-core install chromium webkit` once, then `npm run test:mobile`. It opens the built Web panel in Chromium and WebKit and checks scrolling, narrow-screen controls, rotation, conclusion cards, scrollable report tables, and the council wizard inside a height-constrained host.
 
-The build writes a self-contained extension to `dist/`. For backend-only development, `npm run build:backend` rebuilds `dist/backend/index.mjs`. The page bundles React and the council app. Web registers a main-workspace panel that imports the page bundle. Desktop registers a classic script and mounts the app in a private shadow root. All three surfaces share the same data directory and RPC contracts.
+The build writes a self-contained extension to `dist/`. For backend-only development, `npm run build:backend` rebuilds `dist/backend/index.mjs`. The page bundles React and the council app. Web registers a main-workspace panel that imports the page bundle. Desktop registers a classic script and mounts the app in a private shadow root. On phones, agenda conclusions appear as cards. Swipe wide tables inside discussions, the roster, and reports. Opening or downloading an older report adapts its layout while preserving its stored content and print script. All three surfaces share the same data directory and RPC contracts.
 
 ## Local installation
 
