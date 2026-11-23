@@ -31,7 +31,7 @@ For release-based updates, use the GitHub source `mythezone/codexhost-ext-the-al
 
 1. Set the release version in `manifest.json` and the npm package metadata. Build, pack and run the validation commands above.
 2. `dist-release/` contains `the-althing.zip`, the individual `icon.png`, any declared screenshots, `SHA256SUMS.txt`, and `sources-the-althing.json`. The ZIP has a root manifest. The packer uses the council's own DEFLATE/STORE writer.
-3. Publish a stable release of the manifest's public GitHub repository. Attach the ZIP and the separate image assets with the exact generated filenames. Attach the checksums for download verification. Give changed ZIP bytes a new version.
+3. Publish a stable release of the manifest's public GitHub repository. Attach exactly one ZIP named `the-althing.zip`, the separate image assets with their generated filenames, `SHA256SUMS.txt`, and `sources-the-althing.json`. Give changed ZIP bytes a new version.
 4. Submit the public repository URL through the marketplace's extension submission issue form. The registry maintainers can copy `sources-the-althing.json` to `sources/the-althing.json`. Registry CI validates the public release and generates catalog metadata. [Marketplace registry and submission instructions](https://github.com/BytePioneer-AI/codexhost-extensions-registry)
  
 Local validation runs the upstream validator pinned in `package-lock.json` against a local representation of the prospective GitHub release. It checks the on-disk release assets, compares packaged files with `dist/`, and links the page and Web module graphs with browser Rollup. Public release availability and catalog acceptance are checked by the registry after submission.
@@ -72,13 +72,15 @@ Here `invoke` denotes the shared RPC client method `rpc.call`, which handles bot
 
 | RPC family | Request and result |
 | --- | --- |
-| `topics` | `create({ data })`, `get({ topicId })`, `update({ topicId, patch })`, `delete({ topicId })`, and `list({ q?, status?, tag?, projectCwd? })`. Lists return cards. Topic trees include report metadata. |
+| `topics` | `create({ data })`, `get({ topicId, summaryOnly? })`, `body({ topicId, kind, resourceId })`, `update({ topicId, patch })`, `delete({ topicId })`, and `list({ q?, status?, tag?, projectCwd? })`. Lists return cards. Topic trees include report metadata. |
 | `agendas`, `sub-agendas`, `dispatches`, `contributions` | Send `topicId` and `data` for creation. Sub-agendas take `agendaId`. Dispatches and contributions take `subAgendaId`. Updates take the resource ID and `patch`. |
 | `reports` | `publish({ topicId, data })` returns report metadata. `get({ topicId, reportId })` returns the complete publication. |
 | `archives` | Create or list with `topicId`. Download a saved archive with `{ topicId, archiveId, chunkIndex }`. `import-begin({ totalBytes })` allocates an `uploadId`. Send `import-chunk({ uploadId, chunkIndex, base64 })` for each 512 KiB chunk, then `import-commit({ uploadId })`. A repeated commit returns the same restored `topicId`. Release the upload after receiving this result. |
 | `exports` | Start `download-chunk({ topicId, format, chunkIndex: 0 })`. Use the returned `downloadId` for subsequent chunks of that snapshot. Supported formats are `archive-zip`, `standalone-html`, and `markdown-bundle`. Release the download after assembly. |
 | `events/since` | `{ cursor, topicId? }` returns `{ cursor, events, activeRunCount, truncated }`. Advance using the returned cursor. Refresh cards or the topic tree if older events have expired. |
 | `codexhost` | `status`, `projects`, `threads`, `harnesses`, and `harness-inspect` provide Host inventory. Inspect with `{ harnessId, cwd?, refresh? }`. Select the project from `projects` and an advertised model from the inspection catalog. |
+
+The reader requests `summaryOnly: true` on entry. Each sub-agenda carries its contribution summaries once. Dispatches reference them by `contribution_ids`. The empty `full_content` and `prompt_full` fields have matching Unicode character counts in `full_content_length` and `prompt_full_length`. Expanding a response or prompt fetches `{ text }` from `topics/body` with kind `contribution` or `dispatch`. Omitting `summaryOnly` returns the complete topic tree.
 
 ## Council runs
 

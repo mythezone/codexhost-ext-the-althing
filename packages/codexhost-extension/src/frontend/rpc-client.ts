@@ -1,3 +1,5 @@
+import { Lru } from "./lru";
+import type { Contribution, Dispatch, Topic } from "./types";
 export type Backend = {
   invoke: (method: string, params?: any) => Promise<any>;
 };
@@ -51,6 +53,78 @@ export class RpcClient {
     private backend: Backend,
     readonly signal?: AbortSignal,
   ) {}
+  private bodies = new Lru<string, string>(80, 2 * 1024 * 1024);
+  private bodyRequests = new Map<string, Promise<string>>();
+  async topicSummary(topicId: string): Promise<Topic> {
+    type Summary = ReturnType<
+      typeof import("../backend/domain/council").topicSummary
+    >;
+    const topic = await this.call<Summary | Topic>("topics/get", {
+      topicId,
+      summaryOnly: true,
+    });
+    return {
+      ...topic,
+      agendas: topic.agendas.map((a) => ({
+        ...a,
+        sub_agendas: a.sub_agendas.map((s) => {
+          const byId = new Map(s.contributions.map((c) => [c.id, c]));
+          return {
+            ...s,
+            dispatches: s.dispatches.map((d) =>
+              "contribution_ids" in d
+                ? {
+                    ...d,
+                    contributions: d.contribution_ids.map((id) =>
+                      byId.get(id)!,
+                    ),
+                  }
+                : d,
+            ),
+          };
+        }),
+      })),
+    };
+  }
+  private bodyKey(row: Contribution | Dispatch) {
+    return JSON.stringify([
+      row.topic_id,
+      "full_content" in row ? "contribution" : "dispatch",
+      row.id,
+      row.created_at,
+      row.updated_at,
+    ]);
+  }
+  cachedBody(row: Contribution | Dispatch) {
+    const contribution = "full_content" in row;
+    const inline = contribution ? row.full_content : row.prompt_full;
+    if (
+      inline ||
+      !(contribution ? row.full_content_length : row.prompt_full_length)
+    )
+      return inline;
+    return this.bodies.get(this.bodyKey(row));
+  }
+  body(row: Contribution | Dispatch): string | Promise<string> {
+    const cached = this.cachedBody(row);
+    if (cached !== undefined) return cached;
+    const key = this.bodyKey(row);
+    const active = this.bodyRequests.get(key);
+    if (active) return active;
+    const kind = "full_content" in row ? "contribution" : "dispatch";
+    const request = this.call<{ text: string }>("topics/body", {
+      topicId: row.topic_id,
+      kind,
+      resourceId: row.id,
+    })
+      .then(({ text }) => {
+        this.bodies.set(key, text, text.length);
+        return text;
+      })
+      .finally(() => this.bodyRequests.delete(key));
+    this.bodyRequests.set(key, request);
+    return request;
+  }
   private async result(method: string, params: Params, signal?: AbortSignal) {
     signal?.throwIfAborted();
     let v = await this.backend.invoke("althing/" + method, params);

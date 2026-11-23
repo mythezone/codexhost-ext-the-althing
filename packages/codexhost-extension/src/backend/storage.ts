@@ -283,7 +283,11 @@ export class Store {
     await this.recover();
   }
   async load(tid: string) {
-    const tree = await this.json<StoredTopic>(topicPath(tid) + "/topic.json");
+    // A typical council is 1–2 MiB. Use native parsing for these reads; large archives still stream.
+    const tree: StoredTopic = parseJsonBytes(
+      await this.read(topicPath(tid) + "/topic.json"),
+      4 * 1024 * 1024,
+    );
     if (tree.id !== tid) throw Error("Unknown topic");
     return tree;
   }

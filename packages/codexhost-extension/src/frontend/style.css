@@ -131,6 +131,9 @@ progress::-moz-progress-bar { background: var(--primary); border-radius: 20px; }
 .empty h2, .empty h3 { font-size: clamp(20px, 2.2vw, 32px); }
 .topic-body { padding-top: 6px; padding-bottom: 40px; }
 .panel { padding: clamp(13px, 1.45vw, 22px); margin-bottom: 13px; }
+.topic-skeleton i { display: block; height: .8em; width: 80%; margin: .8em 0; background: var(--wash); border-radius: 4px; }
+.topic-skeleton i:first-child { width: 38%; }
+.topic-skeleton i:last-child { width: 62%; }
 .panel > h2 { margin-bottom: 10px; }
 .section-title, .spread, .dialog-head, .dialog-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .section-title { padding-bottom: 10px; }

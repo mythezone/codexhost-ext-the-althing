@@ -1,12 +1,22 @@
 import { useL, useWorkspace } from "./context";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import {
+  memo,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { CouncilIcon } from "./CouncilIcon";
+import { Lru } from "./lru";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { Check, ChevronDown, Circle, Package, X } from "lucide-react";
 
-export function Markdown({ text }: { text?: string }) {
-  if (!text) return null;
+const markdownHtml = new Lru<string, string>(400, 2 * 1024 * 1024);
+function renderMarkdown(text: string) {
+  const cached = markdownHtml.get(text);
+  if (cached !== undefined) return cached;
   const html = marked.parse(text, { async: false, gfm: true }) as string;
   const clean = DOMPurify.sanitize(html, {
     ALLOWED_TAGS: [
@@ -58,6 +68,13 @@ export function Markdown({ text }: { text?: string }) {
     table.replaceWith(region);
     region.append(table);
   }
+  const result = clean.innerHTML;
+  if (text.length <= 128 * 1024)
+    markdownHtml.set(text, result, text.length + result.length);
+  return result;
+}
+export const Markdown = memo(function Markdown({ text }: { text?: string }) {
+  if (!text) return null;
   return (
     <div
       className="prose"
@@ -70,11 +87,11 @@ export function Markdown({ text }: { text?: string }) {
         }
       }}
       dangerouslySetInnerHTML={{
-        __html: clean.innerHTML,
+        __html: renderMarkdown(text),
       }}
     />
   );
-}
+});
 export function Points({ items }: { items: string[] }) {
   return items.length ? (
     <ul className="points">
@@ -137,10 +154,12 @@ export function Live({ on }: { on: boolean }) {
   );
 }
 export function Fold({
+  print = false,
   summary,
   children,
 }: {
   summary: string;
+  print?: boolean;
   children: ReactNode;
 }) {
   const l = useL();
@@ -156,8 +175,12 @@ export function Fold({
         <ChevronDown size={15} className={open ? "turned" : ""} />
         {open ? l("Hide full text", "收起原文") : summary}
       </button>
-      <div className={"reveal " + (open ? "opened" : "")} id={id} inert={!open}>
-        <div>{children}</div>
+      <div
+        className={"reveal " + (open ? "opened" : "")}
+        id={id}
+        inert={!open && !print}
+      >
+        {(open || print) && <div>{children}</div>}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Plus, Search, Upload } from "lucide-react";
 import { useAssets, useL, useWorkspace } from "./context";
 import type { Card } from "./types";
@@ -9,11 +9,13 @@ export function Home({
   cwd,
   setCwd,
   create,
+  prefetch,
 }: {
   cards: Card[];
   cwd: string;
   setCwd: (s: string) => void;
   create: () => void;
+  prefetch: (id: string) => void;
 }) {
   const l = useL(),
     assets = useAssets(),
@@ -21,6 +23,14 @@ export function Home({
     file = useRef<HTMLInputElement>(null);
   const [q, search] = useState(""),
     [filter, choose] = useState("all");
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const stopPrefetch = () => clearTimeout(timer.current);
+  function warm(id: string) {
+    stopPrefetch();
+    if (window.matchMedia?.("(hover: hover)").matches)
+      timer.current = setTimeout(() => prefetch(id), 120);
+  }
+  useEffect(() => stopPrefetch, []);
   const visible = cards.filter(
     (t) =>
       (!cwd || workspaceKey(cwd) === workspaceKey(t.projectCwd)) &&
@@ -172,7 +182,16 @@ export function Home({
                 {l("Reports", "报告")} <b>{t.report_count}</b>
               </span>
             </div>
-            <button onClick={() => navigate({ topicId: t.id })}>
+            <button
+              onPointerEnter={() => warm(t.id)}
+              onPointerLeave={stopPrefetch}
+              onFocus={() => warm(t.id)}
+              onBlur={stopPrefetch}
+              onClick={() => {
+                stopPrefetch();
+                navigate({ topicId: t.id });
+              }}
+            >
               {l("Enter council", "进入议题")}
               <ArrowRight size={16} />
             </button>

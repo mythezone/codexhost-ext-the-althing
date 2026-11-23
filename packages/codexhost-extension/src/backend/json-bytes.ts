@@ -1,9 +1,9 @@
 import { isUtf8 } from "node:buffer";
 import { JSONParser } from "@streamparser/json";
 
-export function parseJsonBytes(bytes: Buffer) {
+export function parseJsonBytes(bytes: Buffer, nativeLimit = 1024 * 1024) {
   if (!isUtf8(bytes)) throw Error("Invalid UTF-8 JSON");
-  if (bytes.length < 1024 * 1024) return JSON.parse(bytes.toString("utf8"));
+  if (bytes.length < nativeLimit) return JSON.parse(bytes.toString("utf8"));
   const parser = new JSONParser({ stringBufferSize: 65536 });
   let result: unknown;
   parser.onValue = ({ value, parent, key, stack }) => {

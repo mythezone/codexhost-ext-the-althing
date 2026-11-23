@@ -238,5 +238,5 @@ export function query(root: HTMLElement) {
       ".althing-ext-root",
     );
   assert.ok(app);
-  return within(app);
+  return within(app.parentElement!);
 }

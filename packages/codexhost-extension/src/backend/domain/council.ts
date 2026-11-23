@@ -435,6 +435,13 @@ function counts(t: StoredTopic) {
 }
 const ordered = <T extends { order_index: number | null }>(rows: T[]) =>
   [...rows].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+// Match the reader’s character count without allocating an array of every code point.
+function characters(text: string) {
+  let count = text.length;
+  const pairs = /[\uD800-\uDBFF][\uDC00-\uDFFF]/g;
+  while (pairs.test(text)) count--;
+  return count;
+}
 export function hydrate(t: StoredTopic, reportContent = false): Topic {
   return {
     ...publicProgress(t),
@@ -452,6 +459,29 @@ export function hydrate(t: StoredTopic, reportContent = false): Topic {
           })),
         };
       }),
+    })),
+  };
+}
+export function topicSummary(t: StoredTopic) {
+  const full = hydrate(t);
+  return {
+    ...full,
+    agendas: full.agendas.map((a) => ({
+      ...a,
+      sub_agendas: a.sub_agendas.map((s) => ({
+        ...s,
+        contributions: s.contributions.map((c) => ({
+          ...c,
+          full_content: "",
+          full_content_length: characters(c.full_content),
+        })),
+        dispatches: s.dispatches.map(({ contributions, ...d }) => ({
+          ...d,
+          prompt_full: "",
+          prompt_full_length: characters(d.prompt_full),
+          contribution_ids: contributions.map((c) => c.id),
+        })),
+      })),
     })),
   };
 }

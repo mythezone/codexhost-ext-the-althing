@@ -4,7 +4,7 @@ import { ArrowLeft, ChevronDown, ScrollText, UsersRound } from "lucide-react";
 import { CouncilIcon } from "./CouncilIcon";
 import { Status } from "./ui";
 import { plugins } from "./plugins/registry";
-import type { Topic } from "./types";
+import type { Card, Topic } from "./types";
 
 function TempleMark() {
   return (
@@ -69,7 +69,7 @@ function ProgressDial({ value }: { value: number }) {
 }
 
 type Props = {
-  topic: Topic;
+  topic: Card | Topic;
   tab: string;
   onSelect: (id: string) => void;
   actions: ReactNode;
@@ -86,7 +86,8 @@ export default function TopicNavigation({
   const menu = useRef<HTMLDetailsElement>(null);
   const [expanded, setExpanded] = useState(false);
   const activity = t.current_activity;
-  const agenda = t.agendas.find((a) => a.id === tab);
+  const agendas = "agendas" in t ? t.agendas : [];
+  const agenda = agendas.find((a) => a.id === tab);
 
   useEffect(() => {
     const outside = (event: PointerEvent) => {
@@ -171,7 +172,12 @@ export default function TopicNavigation({
           aria-label={l("Council navigation", "议题导航")}
         >
           {link("overview", l("Overview", "总览"), <TempleMark />)}
-          {t.agendas.length > 0 && (
+          {!("agendas" in t) && t.agenda_count > 0 && (
+            <button className="council-nav-link" disabled>
+              {l("Agendas", "议程")} · {t.agenda_count}
+            </button>
+          )}
+          {agendas.length > 0 && (
             <details className="council-agendas" ref={menu}>
               <summary
                 className={agenda ? "chosen-agenda" : ""}
@@ -179,11 +185,11 @@ export default function TopicNavigation({
               >
                 <CouncilIcon name="layers" size={20} />
                 <span>{l("Agendas", "议程")}</span>
-                <small>{agenda?.code || t.agendas.length}</small>
+                <small>{agenda?.code || agendas.length}</small>
                 <ChevronDown size={14} />
               </summary>
               <div className="council-agenda-list">
-                {t.agendas.map((a, i) => (
+                {agendas.map((a, i) => (
                   <button
                     type="button"
                     key={a.id}

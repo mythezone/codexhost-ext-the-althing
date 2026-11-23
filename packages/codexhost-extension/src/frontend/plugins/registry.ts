@@ -10,7 +10,7 @@ export type ContributionRenderer = Extension & {
   component: ComponentType<{ contribution: Contribution }>;
 };
 export type ToolbarAction = Extension & {
-  component: ComponentType<{ topic: Topic }>;
+  component: ComponentType<{ topic: Topic; onPrint: () => void }>;
 };
 export type ReportWidget = Extension & {
   component: ComponentType<{ report: Report }>;

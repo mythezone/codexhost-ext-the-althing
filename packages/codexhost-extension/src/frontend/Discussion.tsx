@@ -1,9 +1,9 @@
-import { useL } from "./context";
-import type { CSSProperties } from "react";
+import { useL, useWorkspace } from "./context";
+import { useEffect, useState, type CSSProperties } from "react";
 import { BadgeCheck, Hash, Reply } from "lucide-react";
 import { AgentAvatar } from "./AgentAvatar";
 import { plugins } from "./plugins/registry";
-import type { Contribution, SubAgenda, Topic } from "./types";
+import type { Contribution, Dispatch, SubAgenda, Topic } from "./types";
 import { Fold, Markdown, Points } from "./ui";
 
 export type Target = {
@@ -13,12 +13,48 @@ export type Target = {
   color: string;
 };
 
+function Body({ row }: { row: Dispatch | Contribution }) {
+  const { rpc } = useWorkspace(),
+    l = useL();
+  const cached = rpc.cachedBody(row);
+  const [text, setText] = useState<string>(),
+    [error, setError] = useState(""),
+    [attempt, retry] = useState(0);
+  useEffect(() => {
+    if (cached !== undefined) return;
+    let live = true;
+    setError("");
+    Promise.resolve(rpc.body(row))
+      .then((value) => {
+        if (live) setText(value);
+      })
+      .catch((e) => {
+        if (live) setError(e.message);
+      });
+    return () => {
+      live = false;
+    };
+  }, [row, rpc, attempt, cached]);
+  if (cached !== undefined || text !== undefined)
+    return <Markdown text={cached ?? text} />;
+  if (error)
+    return (
+      <p role="alert">
+        {error}{" "}
+        <button onClick={() => retry(attempt + 1)}>{l("Retry", "重试")}</button>
+      </p>
+    );
+  return <p role="status">{l("Loading text…", "正在读取原文…")}</p>;
+}
+
 function ResponseCard({
   c,
+  print,
   targets,
   jump,
 }: {
   c: Contribution;
+  print: boolean;
   targets: Map<string, Target>;
   jump: (target: Target) => void;
 }) {
@@ -93,14 +129,15 @@ function ResponseCard({
         </ul>
       )}
       <Fold
+        print={print}
         summary={
           l("Read full text", "展开完整原文") +
           " (" +
-          Array.from(c.full_content).length +
+          (c.full_content_length ?? Array.from(c.full_content).length) +
           ")"
         }
       >
-        <Markdown text={c.full_content} />
+        <Body row={c} />
       </Fold>
     </article>
   );
@@ -118,11 +155,13 @@ export function Discussion({
   targets,
   jump,
   moderator,
+  print = false,
 }: {
   s: SubAgenda;
   targets: Map<string, Target>;
   jump: (target: Target) => void;
   moderator?: Topic["moderator"];
+  print?: boolean;
 }) {
   const l = useL();
   const rounds = Array.from(
@@ -172,8 +211,11 @@ export function Discussion({
                     <h3>{d.title}</h3>
                     <Markdown text={d.prompt_summary} />
                   </div>
-                  <Fold summary={l("Show full prompt", "展开完整任务")}>
-                    <Markdown text={d.prompt_full} />
+                  <Fold
+                    print={print}
+                    summary={l("Show full prompt", "展开完整任务")}
+                  >
+                    <Body row={d} />
                   </Fold>
                 </article>
               );
@@ -181,7 +223,13 @@ export function Discussion({
           {s.contributions
             .filter((c) => c.round_number === n)
             .map((c) => (
-              <ResponseCard key={c.id} c={c} targets={targets} jump={jump} />
+              <ResponseCard
+                print={print}
+                key={c.id}
+                c={c}
+                targets={targets}
+                jump={jump}
+              />
             ))}
         </section>
       ))}

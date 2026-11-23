@@ -511,7 +511,8 @@ test("final report selects executive prose and substantive findings after metada
   const summary = "调查支持延长周末开放时间。";
   for (const hasSummary of [true, false]) {
     const report = [
-      "# 年度报告\n" + meta,
+      "# 年度报告\n" + meta.replace("主题 ID", "话题 ID"),
+      '<a id="start"></a>',
       links,
       "---",
       "[返回目录](#toc)",
@@ -562,6 +563,23 @@ test("structured panelist output retains verbatim response and readable findings
   assert.match(c.key_points[1], /location: 北区.*count: 7/);
   assert.equal(c.key_points[2], "0");
   assert.deepEqual(c.stance_tags, ["条件支持", "需复核"]);
+  for (const marker of ["**Stance tags:**", "**立场标签**："]) {
+    const { runs } = await o.dispatchRound("study", "s", {
+      target_panelist_ids: ["p1"],
+    });
+    const done = await finishRun(
+      runs[0].id,
+      '话题 ID `study`\n<a id="anchor"></a>\n\n观察结果。\n\n' +
+        marker +
+        " 复核，观察",
+    );
+    assert.equal(done.status, "completed");
+    const last = (
+      await store.load("study")
+    ).agendas[0].sub_agendas[0].contributions.at(-1)!;
+    assert.equal(last.summary, "观察结果。");
+    assert.deepEqual(last.stance_tags, ["复核", "观察"]);
+  }
 });
 
 test("plan reads a complete JSON object between commentary, respecting quoted braces and escapes", async (t) => {

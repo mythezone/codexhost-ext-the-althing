@@ -90,12 +90,12 @@ plugins.register("contributions", {
 plugins.register("actions", {
   id: "print",
   label: "打印",
-  component: () => (
+  component: ({ onPrint }) => (
     <button
       className="icon"
       title={useL()("Print agenda", "打印当前议程")}
       aria-label={useL()("Print agenda", "打印当前议程")}
-      onClick={() => window.print()}
+      onClick={onPrint}
     >
       <CouncilIcon name="print" size={19} />
       <span>{useL()("Print", "打印")}</span>

@@ -312,6 +312,10 @@ for (const engine of [chromium, webkit]) {
         await root
           .getByRole("button", { name: "Expert roster", exact: true })
           .tap();
+        await root
+          .getByRole("button", { name: "Expert roster", exact: true })
+          .and(root.locator('[aria-current="page"]'))
+          .waitFor();
         const label = engine.name() + " " + width;
         await verifyScrollRegion(
           page,

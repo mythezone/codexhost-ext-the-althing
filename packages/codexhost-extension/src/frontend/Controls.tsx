@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Agenda, SubAgenda, Topic } from "./types";
 import { useL, useWorkspace } from "./context";
 import { Modal } from "./ui";
@@ -125,16 +125,49 @@ export function DispatchDialog({
     [people, setPeople] = useState(topic.panelists.map((p) => p.id)),
     [targets, setTargets] = useState<string[]>([]),
     [edited, edit] = useState<string | null>(null);
-  const contributions = topic.agendas.flatMap((a) =>
-    a.sub_agendas.flatMap((s) => s.contributions),
+  const contributions = useMemo(
+    () =>
+      topic.agendas.flatMap((a) =>
+        a.sub_agendas.flatMap((s) => s.contributions),
+      ),
+    [topic.agendas],
   );
+  const selected = useMemo(
+    () => contributions.filter((c) => targets.includes(c.id)),
+    [contributions, targets],
+  );
+  const deferred = useMemo(
+    () => selected.filter((c) => !c.full_content && c.full_content_length),
+    [selected],
+  );
+  const [loaded, setLoaded] = useState<Record<string, string>>({}),
+    [bodyError, failBody] = useState(""),
+    [attempt, retry] = useState(0);
+  useEffect(() => {
+    let live = true;
+    failBody("");
+    if (deferred.length)
+      Promise.all(deferred.map(async (c) => [c.id, await rpc.body(c)] as const))
+        .then((entries) => {
+          if (live) setLoaded(Object.fromEntries(entries));
+        })
+        .catch((e) => {
+          if (live) failBody(e.message);
+        });
+    return () => {
+      live = false;
+    };
+  }, [rpc, deferred, attempt]);
+  const waiting = deferred.some((c) => loaded[c.id] === undefined);
   const prompt =
     edited ??
     roundPrompt(
       topic,
       sub,
       type,
-      contributions.filter((c) => targets.includes(c.id)),
+      selected.map((c) =>
+        c.full_content ? c : { ...c, full_content: loaded[c.id] ?? "" },
+      ),
     );
   const toggle = (list: string[], id: string) =>
     list.includes(id) ? list.filter((v) => v !== id) : [...list, id];
@@ -143,6 +176,7 @@ export function DispatchDialog({
       <form
         onSubmit={async (e) => {
           e.preventDefault();
+          if (waiting) return;
           if (
             await perform(() =>
               rpc.call("council/dispatch-round", {
@@ -207,13 +241,30 @@ export function DispatchDialog({
           {l("Public prompt", "公开提示词")}
           <textarea
             rows={8}
+            readOnly={waiting}
             required
             value={prompt}
             onChange={(e) => edit(e.target.value)}
           />
         </label>
+        {waiting &&
+          (bodyError ? (
+            <p role="alert">
+              {bodyError}{" "}
+              <button type="button" onClick={() => retry(attempt + 1)}>
+                {l("Retry", "重试")}
+              </button>
+            </p>
+          ) : (
+            <p role="status">
+              {l("Loading selected responses…", "正在读取选中发言…")}
+            </p>
+          ))}
         <footer className="form-footer">
-          <button disabled={!people.length || busy} className="primary">
+          <button
+            disabled={!people.length || busy || waiting}
+            className="primary"
+          >
             {l("Send round", "派发本轮")}
           </button>
         </footer>

@@ -1,7 +1,7 @@
 import {
+  startTransition,
   useState,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useReducer,
   useCallback,
@@ -28,6 +28,8 @@ import { RpcClient, watchEvents } from "./rpc-client";
 import type { Card, Topic } from "./types";
 import { Live } from "./ui";
 import { Home } from "./Home";
+import { Lru } from "./lru";
+import TopicNavigation from "./TopicNavigation";
 import { TopicPage } from "./TopicPage";
 import { Wizard } from "./Wizard";
 import paper from "./themes/packs/editorial-paper.json";
@@ -35,13 +37,11 @@ import slate from "./themes/packs/cool-slate.json";
 import night from "./themes/packs/obsidian-night.json";
 declare const __ALTHING_CSS__: string;
 const themes = [paper, slate, night];
-const art = [
-  "council",
-  "owl",
-  "research",
-  "report",
-  "winged-book",
-].map((n) => n + ".webp");
+const art = ["council", "owl", "research", "report", "winged-book"].map(
+  (n) => n + ".webp",
+);
+
+type Snapshot = { topic: Topic; runs: Run[]; version: number };
 
 function App({
   api,
@@ -66,26 +66,38 @@ function App({
   const [dest, go] = useState<Destination>(surface.initial || {}),
     [cwd, setCwd] = useState(surface.initial?.projectCwd || ""),
     [wizard, show] = useState(!!surface.initial?.newCouncil),
-    [topic, setTopic] = useState<Topic>(),
-    [runs, setRuns] = useState<Run[]>([]);
+    [snapshot, setSnapshot] = useState<Snapshot>();
+  const cache = useMemo(() => new Lru<string, Snapshot>(8), [rpc]);
+  const knownIds = useRef(new Set<string>());
+  const pending = useRef(
+    new Map<string, { version: number; request: Promise<Snapshot> }>(),
+  );
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     lock = useRef(false),
     [version, refresh] = useReducer((n: number) => n + 1, 0);
-  const viewport = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    if (viewport.current) viewport.current.scrollTop = 0;
-  }, [dest.topicId]);
   const l = useCallback(
     (en: string, zh: string) => (locale.startsWith("zh") ? zh : en),
     [locale],
   );
-  const navigate = useCallback((d: Destination) => {
-    go(d);
-    if (d.projectCwd !== undefined) setCwd(d.projectCwd);
-    show(!!d.newCouncil);
-    setError("");
-  }, []);
+  const navigate = useCallback(
+    (d: Destination) => {
+      startTransition(() => {
+        go(d);
+        setSnapshot((current) =>
+          current?.topic.id === d.topicId
+            ? current
+            : d.topicId
+              ? cache.get(d.topicId)
+              : undefined,
+        );
+      });
+      if (d.projectCwd !== undefined) setCwd(d.projectCwd);
+      show(!!d.newCouncil);
+      setError("");
+    },
+    [cache],
+  );
   useEffect(() => {
     const onNav = (e: Event) =>
       navigate((e as CustomEvent<Destination>).detail);
@@ -181,7 +193,23 @@ function App({
     rpc
       .call<Card[]>("topics/list")
       .then((c) => {
-        if (live) setCards(c);
+        if (!live) return;
+        const next = new Set(c.map((card) => card.id));
+        const removed = [...knownIds.current].filter((id) => !next.has(id));
+        for (const id of removed) {
+          cache.delete(id);
+          pending.current.delete(id);
+        }
+        if (removed.length) {
+          setSnapshot((current) =>
+            current && removed.includes(current.topic.id) ? undefined : current,
+          );
+          go((current) =>
+            current.topicId && removed.includes(current.topicId) ? {} : current,
+          );
+        }
+        knownIds.current = next;
+        setCards(c);
       })
       .catch((e) => {
         if (live) setError(e.message);
@@ -189,19 +217,45 @@ function App({
     return () => {
       live = false;
     };
-  }, [rpc, version]);
+  }, [rpc, cache, version]);
+  const loadTopic = useCallback(
+    (id: string) => {
+      const cached = cache.get(id);
+      if (cached?.version === version) return Promise.resolve(cached);
+      const active = pending.current.get(id);
+      if (active?.version === version) return active.request;
+      const request = rpc
+        .topicSummary(id)
+        .then(async (topic) => {
+          const host = topic.metadata.codexhost;
+          // The metadata and council/runs represent the same persisted runs. Keep this snapshot atomic.
+          const runs =
+            host &&
+            typeof host === "object" &&
+            !Array.isArray(host) &&
+            Array.isArray(host.runs)
+              ? (host.runs as unknown as Run[])
+              : await rpc.call<Run[]>("council/runs", { topicId: id });
+          const value = { topic, runs, version };
+          if (pending.current.get(id)?.request === request)
+            cache.set(id, value);
+          return value;
+        })
+        .finally(() => {
+          if (pending.current.get(id)?.request === request)
+            pending.current.delete(id);
+        });
+      pending.current.set(id, { version, request });
+      return request;
+    },
+    [rpc, cache, version],
+  );
   useEffect(() => {
     let live = true;
     if (dest.topicId)
-      Promise.all([
-        rpc.call<Topic>("topics/get", { topicId: dest.topicId }),
-        rpc.call<Run[]>("council/runs", { topicId: dest.topicId }),
-      ])
-        .then(([t, r]) => {
-          if (live) {
-            setTopic(t);
-            setRuns(r);
-          }
+      loadTopic(dest.topicId)
+        .then((value) => {
+          if (live) startTransition(() => setSnapshot(value));
         })
         .catch((e) => {
           if (live) setError(e.message);
@@ -209,7 +263,10 @@ function App({
     return () => {
       live = false;
     };
-  }, [rpc, version, dest.topicId]);
+  }, [loadTopic, dest.topicId]);
+  const topic =
+    dest.topicId === snapshot?.topic.id ? snapshot?.topic : undefined;
+  const card = cards.find((c) => c.id === dest.topicId);
   async function perform(action: () => Promise<unknown>) {
     if (lock.current) return false;
     lock.current = true;
@@ -253,7 +310,7 @@ function App({
             rpc,
             settings,
             projects,
-            runs,
+            runs: snapshot?.runs ?? [],
             surface,
             navigate,
             refresh,
@@ -265,7 +322,7 @@ function App({
         >
           <div
             className="althing-ext-root"
-            ref={viewport}
+            key={dest.topicId ?? ""}
             lang={locale}
             data-theme={theme.id}
             style={
@@ -320,20 +377,49 @@ function App({
               </aside>
             )}
             {dest.topicId ? (
-              topic?.id === dest.topicId ? (
-                <TopicPage
-                  key={JSON.stringify(dest)}
-                  topic={topic}
-                  initial={dest}
-                />
+              topic ? (
+                <TopicPage key={topic.id} topic={topic} initial={dest} />
               ) : (
-                <p role="status">{l("Loading council…", "正在加载议题…")}</p>
+                <main className="topic-body" aria-busy="true">
+                  {card && (
+                    <>
+                      <TopicNavigation
+                        topic={card}
+                        tab={dest.tab || "overview"}
+                        onSelect={(tab) => navigate({ ...dest, tab })}
+                        actions={null}
+                      />
+                      <section className="panel">
+                        <p>{card.subtitle}</p>
+                        <div className="tools">
+                          {card.domain_tags.map((tag) => (
+                            <span className="tag" key={tag}>
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </section>
+                    </>
+                  )}
+                  <div
+                    className="panel topic-skeleton"
+                    role="status"
+                    aria-label={l("Loading council…", "正在加载议题…")}
+                  >
+                    <i />
+                    <i />
+                    <i />
+                  </div>
+                </main>
               )
             ) : (
               <Home
                 cards={cards}
                 cwd={cwd}
                 setCwd={setCwd}
+                prefetch={(id) => {
+                  void loadTopic(id).catch(() => {});
+                }}
                 create={() => show(true)}
               />
             )}

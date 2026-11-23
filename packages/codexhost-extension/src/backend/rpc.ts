@@ -3,7 +3,7 @@ import { jsonBytes } from "./json-bytes.ts";
 import { Store, resolveDataDir, archivePath } from "./storage.ts";
 import { CodexHostBridge, modelRef } from "./codexhost-bridge.ts";
 import { Orchestrator } from "./orchestrator.ts";
-import { Council, hydrate, input } from "./domain/council.ts";
+import { Council, hydrate, topicSummary, input } from "./domain/council.ts";
 import { id, json, reportHead, type Kind, type Json } from "./domain/models.ts";
 import { capabilities } from "./domain/protocols.ts";
 import {
@@ -25,6 +25,7 @@ const handlers = [
   "topics/list",
   "topics/create",
   "topics/get",
+  "topics/body",
   "topics/update",
   "topics/delete",
   "agendas/create",
@@ -166,7 +167,24 @@ export async function engine(
           return hydrate(c.tree);
         });
       case "topics/get":
-        return store.serial(async () => hydrate(await store.load(tid())));
+        return store.serial(async () => {
+          const summaryOnly = z.boolean().optional().parse(p.summaryOnly);
+          const tree = await store.load(tid());
+          return summaryOnly ? topicSummary(tree) : hydrate(tree);
+        });
+      case "topics/body": {
+        const kind = z.enum(["contribution", "dispatch"]).parse(p.kind);
+        const resourceId = id.parse(p.resourceId);
+        return store.serial(async () => {
+          const council = new Council(await store.load(tid()));
+          const row = council.get(kind, resourceId);
+          if (row.topic_id !== council.tree.id)
+            throw Error("Unknown resource in this topic");
+          return {
+            text: "full_content" in row ? row.full_content : row.prompt_full,
+          };
+        });
+      }
       case "topics/update":
         return store.transaction(tid(), (c) => {
           const data = { ...input(p.patch ?? p.data) };

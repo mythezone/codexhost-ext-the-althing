@@ -1,4 +1,5 @@
-import { fixture } from "./helpers";
+import { councilFixture, contribution, dispatch, fixture } from "./helpers";
+import { hydrate, topicSummary } from "../src/backend/domain/council";
 import { mockHost } from "./mock-host";
 import { RpcClient } from "../src/frontend/rpc-client";
 import test from "node:test";
@@ -285,5 +286,251 @@ test("built page dispatches through the built backend and receives completed con
   } finally {
     dispose();
     await backend.dispose();
+  }
+});
+
+test("a collapsed fold never parses Markdown and remounting reuses sanitized HTML", async (t) => {
+  dom(t);
+  const { marked } = await import("marked");
+  const parser = t.mock.method(marked, "parse");
+  const { createRoot } = await import("react-dom/client");
+  const { Fold, Markdown } = await import("../src/frontend/ui");
+  const host = document.createElement("div");
+  document.body.append(host);
+  const react = createRoot(host);
+  try {
+    react.render(
+      <Fold summary="Expand">
+        <Markdown text="**Cache probe**" />
+      </Fold>,
+    );
+    const button = await eventually(() => host.querySelector("button"));
+    assert.equal(parser.mock.callCount(), 0);
+    for (let i = 0; i < 2; i++) {
+      fireEvent.click(button);
+      await eventually(
+        () => host.querySelector("strong")?.textContent === "Cache probe",
+      );
+      assert.equal(parser.mock.callCount(), 1);
+      assert.equal(button.getAttribute("aria-expanded"), "true");
+      fireEvent.click(button);
+      await eventually(() => !host.querySelector(".prose"));
+    }
+  } finally {
+    react.unmount();
+    await wait(30);
+  }
+});
+
+test("topic shell, prefetched snapshot, on-demand critique and fold bodies, print and same-topic navigation", async (t) => {
+  dom(t);
+  const h = mockUI(),
+    c = councilFixture();
+  c.create("dispatch", dispatch, "s");
+  c.create("contribution", contribution, "s");
+  const reads: unknown[] = [],
+    bodies: string[] = [];
+  const firstRead = Promise.withResolvers<void>();
+  const firstBody = Promise.withResolvers<void>();
+  const normal = h.api.backend.invoke.bind(h.api.backend);
+  const api = {
+    ...h.api,
+    backend: {
+      invoke: async (name: string, p: any) => {
+        if (name === "althing/topics/get") {
+          reads.push(p.summaryOnly);
+          await firstRead.promise;
+          return p.summaryOnly ? topicSummary(c.tree) : hydrate(c.tree);
+        }
+        if (name === "althing/topics/body") {
+          bodies.push(p.kind);
+          await firstBody.promise;
+          return {
+            text:
+              p.kind === "contribution"
+                ? contribution.full_content
+                : dispatch.prompt_full,
+          };
+        }
+        return normal(name, p);
+      },
+    },
+  };
+  const realMatch = window.matchMedia.bind(window);
+  t.mock.method(window, "matchMedia", (media: string) =>
+    media === "(hover: hover)" ? { matches: true } : realMatch(media),
+  );
+  const host = document.createElement("div");
+  document.body.append(host);
+  const dispose = await mount(host, api);
+  try {
+    const ui = await eventually(() => query(host));
+    const enter = await eventually(
+      () => ui.getAllByRole("button", { name: "Enter council" })[0],
+    );
+    fireEvent.focusIn(enter);
+    await eventually(() => reads.length === 1);
+    fireEvent.click(enter);
+    await eventually(() =>
+      ui.getByRole("heading", { name: fixture.title, level: 1 }),
+    );
+    assert.ok(ui.getByRole("status", { name: "Loading council…" }));
+    assert.ok(ui.getByText(fixture.subtitle));
+    assert.ok(ui.getByText("science"));
+    firstRead.resolve();
+    const shadow = host.firstElementChild!.shadowRoot!;
+    fireEvent.click(
+      await eventually(() => shadow.querySelector(".agenda-link")),
+    );
+    const heading = await eventually(() =>
+      ui.getByRole("heading", { name: fixture.title, level: 1 }),
+    );
+    const fold = await eventually(() =>
+      ui.getByRole("button", { name: "Read full text (12)" }),
+    );
+    assert.equal(shadow.querySelectorAll(".reveal .prose").length, 0);
+    assert.deepEqual(bodies, []);
+    assert.deepEqual(reads, [true]);
+
+    fireEvent.click(ui.getByRole("button", { name: "Dispatch round" }));
+    const dialog = within(await eventually(() => ui.getByRole("dialog")));
+    fireEvent.change(dialog.getByLabelText("Round type"), {
+      target: { value: "critique" },
+    });
+    fireEvent.click(dialog.getByRole("checkbox", { name: /One · Lead/ }));
+    await eventually(() => bodies.length === 1);
+    assert.ok(
+      (dialog.getByRole("button", { name: "Send round" }) as HTMLButtonElement)
+        .disabled,
+    );
+    firstBody.resolve();
+    await eventually(() =>
+      (
+        dialog.getByLabelText("Public prompt") as HTMLTextAreaElement
+      ).value.includes(contribution.full_content),
+    );
+    fireEvent.click(dialog.getByLabelText("Close"));
+    for (let i = 0; i < 2; i++) {
+      fireEvent.click(fold);
+      await eventually(() => ui.getByText(contribution.full_content));
+      fireEvent.click(fold);
+      await eventually(() => !shadow.querySelector(".response .reveal .prose"));
+    }
+    assert.deepEqual(bodies, ["contribution"]);
+    const prompt = ui.getByRole("button", { name: "Show full prompt" });
+    fireEvent.click(prompt);
+    await eventually(() => ui.getByText(dispatch.prompt_full));
+    fireEvent.click(prompt);
+    assert.deepEqual(bodies, ["contribution", "dispatch"]);
+
+    host.dispatchEvent(
+      new CustomEvent("althing:navigate", {
+        detail: { topicId: "study", tab: "a", sub: "s2" },
+      }),
+    );
+    await eventually(
+      () =>
+        shadow.querySelector(".discussion-title")?.textContent === "Comparison",
+    );
+    assert.equal(
+      ui.getByRole("heading", { name: fixture.title, level: 1 }),
+      heading,
+    );
+    fireEvent.click(ui.getByRole("button", { name: "Councils" }));
+    fireEvent.click(
+      await eventually(
+        () => ui.getAllByRole("button", { name: "Enter council" })[0],
+      ),
+    );
+    await eventually(() => ui.getByRole("heading", { name: "Council brief" }));
+    assert.deepEqual(reads, [true]);
+    fireEvent.click(
+      await eventually(() => shadow.querySelector(".agenda-link")),
+    );
+    await eventually(() =>
+      ui.getByRole("button", { name: "Read full text (12)" }),
+    );
+    const print = t.mock.fn(() => {
+      assert.equal(
+        shadow.querySelector(".response .reveal .prose")?.textContent?.trim(),
+        contribution.full_content,
+      );
+      assert.equal(
+        shadow.querySelector(".dispatch .reveal .prose")?.textContent?.trim(),
+        dispatch.prompt_full,
+      );
+    });
+    window.print = print;
+    fireEvent.click(ui.getByRole("button", { name: "Print agenda" }));
+    await eventually(() => print.mock.callCount() === 1);
+    assert.equal(reads[1], undefined);
+    assert.ok(reads.length >= 2);
+    assert.equal(print.mock.calls[0].error, undefined);
+    window.dispatchEvent(new Event("afterprint"));
+    await eventually(() => !shadow.querySelector(".reveal .prose"));
+  } finally {
+    firstRead.resolve();
+    firstBody.resolve();
+    dispose();
+  }
+});
+
+test("an event refreshes the cached topic without replacing the current workspace", async (t) => {
+  dom(t);
+  const h = mockUI();
+  const normal = h.api.backend.invoke.bind(h.api.backend);
+  const tree = councilFixture().tree;
+  const resume = Promise.withResolvers<void>();
+  let changed = false,
+    reads = 0;
+  const api = {
+    ...h.api,
+    backend: {
+      invoke: async (name: string, p: any) => {
+        if (name === "althing/topics/get") {
+          if (++reads > 1) await resume.promise;
+          return topicSummary(tree);
+        }
+        if (changed && name === "althing/events/since") {
+          changed = false;
+          return {
+            cursor: 1,
+            truncated: false,
+            events: [{ topic_id: tree.id }],
+            activeRunCount: 0,
+          };
+        }
+        return normal(name, p);
+      },
+    },
+  };
+  const host = document.createElement("div");
+  document.body.append(host);
+  const dispose = await mount(host, api);
+  try {
+    const ui = await eventually(() => query(host));
+    fireEvent.click(
+      await eventually(
+        () => ui.getAllByRole("button", { name: "Enter council" })[0],
+      ),
+    );
+    await eventually(() => ui.getByRole("heading", { name: "Council brief" }));
+    const heading = ui.getByRole("heading", { name: fixture.title, level: 1 });
+    tree.title = "Revised council";
+    changed = true;
+    document.dispatchEvent(new Event("visibilitychange"));
+    await eventually(() => reads === 2);
+    assert.equal(
+      ui.getByRole("heading", { name: fixture.title, level: 1 }),
+      heading,
+    );
+    assert.equal(ui.queryByRole("status", { name: "Loading council…" }), null);
+    resume.resolve();
+    await eventually(
+      () => ui.getByRole("heading", { name: tree.title, level: 1 }) === heading,
+    );
+  } finally {
+    resume.resolve();
+    dispose();
   }
 });

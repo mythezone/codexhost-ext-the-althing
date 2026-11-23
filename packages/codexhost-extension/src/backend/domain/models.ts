@@ -245,13 +245,19 @@ type Progress = {
   pinned_fields?: string[];
 };
 export type Contribution = z.infer<typeof contribution> &
-  Stamp & { topic_id: string; agenda_id: string; sub_agenda_id: string };
+  Stamp & {
+    topic_id: string;
+    agenda_id: string;
+    sub_agenda_id: string;
+    full_content_length?: number;
+  };
 export type Dispatch = z.infer<typeof dispatch> &
   Stamp & {
     topic_id: string;
     agenda_id: string;
     sub_agenda_id: string;
     contributions: Contribution[];
+    prompt_full_length?: number;
   };
 export type SubAgenda = z.infer<typeof subAgenda> &
   Progress &

@@ -193,7 +193,7 @@ function metadataLine(line: string) {
         /^(?:(?:协议|讨论协议|protocol)\s*[:：]?\s*)?(?:rapid-panel|adversarial-debate|council-standard)$/i.test(
           part,
         ) ||
-        /^(?:主题|议题|topic)[\s_-]*ID\s*[:：]?\s*[\w.-]+$/i.test(part),
+        /^(?:主题|议题|话题|topic)[\s_-]*ID\s*[:：]?\s*[\w.-]+$/i.test(part),
     );
 }
 function onlyLink(token: Token): boolean {
@@ -242,9 +242,13 @@ function extract(
           .split(/\r?\n/)
           .map((line) => line.trim())
           .filter((line) => {
-            if (/^stance tags\s*[:：]/i.test(line)) {
+            const stance =
+              /^(?:\*\*)?(?:stance tags|立场标签)(?:\*\*)?\s*[:：](?:\*\*)?\s*/i.exec(
+                line,
+              );
+            if (stance) {
               tags = line
-                .replace(/^stance tags\s*[:：]/i, "")
+                .slice(stance[0].length)
                 .split(/[,，]/)
                 .map((s) => s.trim())
                 .filter(Boolean);
@@ -253,6 +257,9 @@ function extract(
             if (
               !line ||
               line.startsWith("|") ||
+              /^<a\s+(?:id|name)\s*=\s*(?:"[^"]*"|'[^']*')\s*>\s*<\/a>$/i.test(
+                line,
+              ) ||
               metadataLine(line) ||
               /^(?:目录|table of contents|contents)[:：]?$/i.test(
                 line.replace(/[\*_]/g, ""),

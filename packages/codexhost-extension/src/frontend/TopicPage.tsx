@@ -1,5 +1,13 @@
-import { useLayoutEffect, useRef, useState } from "react";
-import type { Topic } from "./types";
+import {
+  startTransition,
+  useEffect,
+  useMemo,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { flushSync } from "react-dom";
+import type { Topic, SubAgenda } from "./types";
 import { useL, useWorkspace } from "./context";
 import TopicNavigation from "./TopicNavigation";
 import { Discussion, type Target } from "./Discussion";
@@ -28,6 +36,42 @@ export function TopicPage({
     s = a?.sub_agendas.find((s) => s.id === subId) || a?.sub_agendas[0];
   const extra = plugins.tabs.find((p) => "plugin:" + p.id === tab),
     Extra = extra?.component;
+  const [printSub, setPrintSub] = useState<SubAgenda>();
+  const previousDestination = useRef(initial);
+  useLayoutEffect(() => {
+    if (previousDestination.current === initial) return;
+    previousDestination.current = initial;
+    setPrintSub(undefined);
+    setTab(initial.tab || "overview");
+    setSub(initial.sub || "");
+    setReport(initial.reportId || "");
+    show("");
+  }, [initial]);
+  useEffect(() => {
+    const clear = () => setPrintSub(undefined);
+    window.addEventListener("afterprint", clear);
+    return () => window.removeEventListener("afterprint", clear);
+  }, []);
+  async function printAgenda() {
+    if (!s) {
+      window.print();
+      return;
+    }
+    const section = root.current?.querySelector(".discussion");
+    let printable = s;
+    if (
+      s.contributions.some((c) => c.full_content_length) ||
+      s.dispatches.some((d) => d.prompt_full_length)
+    ) {
+      const full = await rpc.call<Topic>("topics/get", { topicId: t.id });
+      printable = full.agendas
+        .flatMap((a) => a.sub_agendas)
+        .find((sub) => sub.id === s.id)!;
+    }
+    if (!printable || !section?.isConnected) return;
+    flushSync(() => setPrintSub(printable));
+    window.print();
+  }
   const [response, focus] = useState("");
   useLayoutEffect(() => {
     if (response) {
@@ -39,21 +83,27 @@ export function TopicPage({
     }
   }, [response]);
   function pick(id: string, sub = "") {
-    setTab(id);
-    setSub(sub);
+    startTransition(() => {
+      setTab(id);
+      setSub(sub);
+      setPrintSub(undefined);
+    });
   }
   const call = (method: string, params = {}) =>
     void perform(() => rpc.call(method, { topicId: t.id, ...params }));
-  const targets = new Map<string, Target>();
-  for (const a of t.agendas)
-    for (const s of a.sub_agendas)
-      for (const c of s.contributions)
-        targets.set(c.id, {
-          c,
-          agenda: a.id,
-          sub: s.id,
-          color: expertColor(c.panelist_id),
-        });
+  const targets = useMemo(() => {
+    const targets = new Map<string, Target>();
+    for (const a of t.agendas)
+      for (const s of a.sub_agendas)
+        for (const c of s.contributions)
+          targets.set(c.id, {
+            c,
+            agenda: a.id,
+            sub: s.id,
+            color: expertColor(c.panelist_id),
+          });
+    return targets;
+  }, [t.agendas]);
   const reports =
     tab === "final"
       ? t.reports.filter((r) => !r.agenda_id)
@@ -61,7 +111,20 @@ export function TopicPage({
         ? t.reports.filter((r) => r.agenda_id === a.id)
         : t.reports;
   return (
-    <main className="topic-body" ref={root}>
+    <main
+      className="topic-body"
+      ref={root}
+      onKeyDown={(e) => {
+        if (
+          (e.ctrlKey || e.metaKey) &&
+          e.key.toLowerCase() === "p" &&
+          !report
+        ) {
+          e.preventDefault();
+          void perform(printAgenda);
+        }
+      }}
+    >
       <TopicNavigation
         topic={t}
         tab={tab}
@@ -112,7 +175,11 @@ export function TopicPage({
               </div>
             </details>
             {plugins.actions.map(({ id, component: Action }) => (
-              <Action topic={t} key={id} />
+              <Action
+                topic={t}
+                key={id}
+                onPrint={() => void perform(printAgenda)}
+              />
             ))}
           </>
         }
@@ -158,7 +225,7 @@ export function TopicPage({
               <button
                 aria-pressed={s?.id === sub.id}
                 key={sub.id}
-                onClick={() => setSub(sub.id)}
+                onClick={() => pick(tab, sub.id)}
               >
                 {sub.title} · {sub.progress_pct}%
               </button>
@@ -220,12 +287,16 @@ export function TopicPage({
             </div>
           </section>
           <Discussion
-            s={s}
+            key={s.id}
+            print={printSub?.id === s.id}
+            s={printSub?.id === s.id ? printSub : s}
             moderator={t.moderator}
             targets={targets}
             jump={(target) => {
-              pick(target.agenda, target.sub);
-              focus(target.c.id);
+              startTransition(() => {
+                pick(target.agenda, target.sub);
+                focus(target.c.id);
+              });
             }}
           />
         </>

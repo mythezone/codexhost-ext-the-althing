@@ -163,6 +163,44 @@ test("built entry registers and exercises every RPC, including delegation, archi
         dispatch_id: "manual",
       },
     });
+    assert.deepEqual(
+      await call("topics/body", {
+        ...p,
+        kind: "contribution",
+        resourceId: "manual-response",
+      }),
+      { text: "Verbatim" },
+    );
+    assert.deepEqual(
+      await call("topics/body", {
+        ...p,
+        kind: "dispatch",
+        resourceId: "manual",
+      }),
+      { text: "Full question" },
+    );
+    const full = await call("topics/get", p);
+    assert.deepEqual(
+      await call("topics/get", { ...p, summaryOnly: false }),
+      full,
+    );
+    assert.equal(JSON.stringify(full).includes("full_content_length"), false);
+    await assert.rejects(call("topics/get", { ...p, summaryOnly: "false" }));
+    await call("topics/create", {
+      data: { id: "unrelated", title: "Unrelated" },
+    });
+    for (const bad of [
+      { ...p, kind: "report", resourceId: "manual" },
+      { ...p, kind: "dispatch", resourceId: "manual-response" },
+      { ...p, kind: "contribution", resourceId: "../manual-response" },
+      {
+        topicId: "unrelated",
+        kind: "contribution",
+        resourceId: "manual-response",
+      },
+    ])
+      await assert.rejects(call("topics/body", bad));
+    await call("topics/delete", { topicId: "unrelated" });
     await call("contributions/update", {
       ...p,
       contributionId: "manual-response",
@@ -279,7 +317,7 @@ test("large report and topic projections remain readable through bounded JSON ch
     await b.call("dispatches/create", {
       ...p,
       subAgendaId: "s",
-      data: { id: "d", title: "D", prompt_full: "?", prompt_summary: "?" },
+      data: { id: "d", title: "D", prompt_full: "🌙夜", prompt_summary: "?" },
     });
     await b.call("contributions/create", {
       ...p,
@@ -291,7 +329,27 @@ test("large report and topic projections remain readable through bounded JSON ch
         full_content: body,
       },
     });
-    assert.equal((await b.call("topics/get", p)).encoding, "json");
+    const fullTopic = await b.call("topics/get", p);
+    assert.equal(fullTopic.encoding, "json");
+    const summary = await b.call("topics/get", { ...p, summaryOnly: true });
+    assert.ok(
+      Buffer.byteLength(JSON.stringify(summary)) < 0.2 * fullTopic.totalBytes,
+    );
+    const sub = summary.agendas[0].sub_agendas[0],
+      reply = sub.contributions[0],
+      task = sub.dispatches[0];
+    assert.equal(reply.full_content, "");
+    assert.equal(reply.full_content_length, Array.from(body).length);
+    assert.deepEqual(task.contribution_ids, [reply.id]);
+    assert.ok(!("contributions" in task));
+    assert.equal(task.prompt_full, "");
+    assert.equal(task.prompt_full_length, 2);
+    const content = await b.call("topics/body", {
+      ...p,
+      kind: "contribution",
+      resourceId: reply.id,
+    });
+    assert.ok(content.encoding === "json" || content.text === body);
     assert.ok(JSON.stringify(await b.call("topics/list")).length < 5000);
   } finally {
     await b.dispose();
