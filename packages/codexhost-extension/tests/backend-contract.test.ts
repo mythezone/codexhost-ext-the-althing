@@ -108,6 +108,7 @@ test("built entry registers and exercises every RPC, including delegation, archi
     await call("codexhost/projects");
     await call("codexhost/threads");
     await call("codexhost/harnesses");
+    assert.equal((await call("codexhost/agents")).agents.length,2);
     await call("codexhost/harness-inspect", { harnessId: "codex" });
     assert.equal(
       (await call("topics/create", { data: fixture })).protocol_id,

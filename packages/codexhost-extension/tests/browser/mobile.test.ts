@@ -544,6 +544,7 @@ for (const engine of [chromium, webkit]) {
         await check("wizard details");
         await dialog.getByRole("button", { name: "Continue" }).tap();
         await dialog.getByRole("button", { name: /Add expert/ }).tap();
+        await dialog.getByRole("button", {name:"Add collaboration experts"}).tap();
         await check("wizard roster");
         await dialog
           .getByRole("button", { name: /Remove expert/ })
@@ -567,6 +568,12 @@ for (const engine of [chromium, webkit]) {
         await check("active overview, archive and report buttons");
         await root.locator(".action-menu summary").tap();
         await menuFits(".action-menu > .tools", ".council-breadcrumb");
+        await root.locator(".action-menu").getByRole("button",{name:"Configure roles & agents"}).tap();
+        await dialog.getByRole("button",{name:"Refresh list"}).waitFor();
+        await dialog.getByRole("option",{name:/Codex · High/}).first().waitFor({state:"attached"});
+        await check("existing roster editor and collaboration agents");
+        await dialog.getByRole("button",{name:"Cancel",exact:true}).tap();
+        if (!await root.locator(".action-menu").evaluate(el=>el.hasAttribute("open"))) await root.locator(".action-menu summary").tap();
         await root.locator(".action-menu summary").tap();
         await root.getByLabel("Choose agenda").tap();
         await menuFits(".council-agenda-list", ".council-navigation");

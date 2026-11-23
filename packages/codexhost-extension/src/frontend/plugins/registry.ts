@@ -3,7 +3,7 @@ import type { Topic, Contribution, Report } from "../types";
 
 type Extension = { id: string; label: string };
 export type TopicTab = Extension & {
-  component: ComponentType<{ topic: Topic }>;
+  component: ComponentType<{ topic: Topic; configure:()=>void }>;
 };
 export type ContributionRenderer = Extension & {
   matches: (c: Contribution) => boolean;

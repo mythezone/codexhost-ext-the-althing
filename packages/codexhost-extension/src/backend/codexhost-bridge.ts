@@ -1,3 +1,4 @@
+import { agentDirectory } from "./agent-directory.ts";
 import { constants } from "node:fs";
 import { open } from "node:fs/promises";
 import path from "node:path";
@@ -106,6 +107,34 @@ export class HostError extends Error {
 }
 export class CodexHostBridge {
   private cached?: Credentials;
+  private readonly directories = new Map<
+    string,
+    { expires: number; result: ReturnType<typeof agentDirectory> }
+  >();
+  listAgents(cwd?: string, refresh = false) {
+    const key = cwd || "";
+    const previous = this.directories.get(key);
+    if (
+      previous &&
+      (!refresh || previous.expires === Infinity) &&
+      previous.expires > Date.now()
+    )
+      return previous.result;
+    const result = agentDirectory(this, path.dirname(this.file), cwd, refresh);
+    const entry = { expires: Infinity, result };
+    this.directories.set(key, entry);
+    if (this.directories.size > 8)
+      this.directories.delete(this.directories.keys().next().value!);
+    result.then(
+      () => {
+        entry.expires = Date.now() + 30_000;
+      },
+      () => {
+        if (this.directories.get(key) === entry) this.directories.delete(key);
+      },
+    );
+    return result;
+  }
   private stop = new AbortController();
   private readonly file: string;
   constructor(

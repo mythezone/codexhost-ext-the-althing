@@ -1,3 +1,4 @@
+import { sameAssignment } from "../shared/agents.ts";
 import path from "node:path";
 import { z } from "zod";
 import { Lexer, type Token } from "marked";
@@ -48,6 +49,14 @@ export type Run = {
   subAgendaId?: string;
   dispatchId?: string;
   panelistId?: string;
+  attribution?: {
+    panelist_name: string;
+    role: string;
+    provider: string;
+    model: string;
+    reasoning_effort: string;
+    subscription: string;
+  };
   threadId: string | null;
   harnessId: string;
   model: Model | null;
@@ -496,6 +505,14 @@ export class Orchestrator {
         const r: Run = {
           ...makeRun(tid, "panelist", cfg),
           panelistId: pid,
+          attribution: {
+            panelist_name: p.name,
+            role: p.role,
+            provider: p.provider,
+            model: p.model,
+            reasoning_effort: p.reasoning_effort,
+            subscription: p.subscription,
+          },
           dispatchId: d.id,
           agendaId: sub.agenda_id,
           subAgendaId: subId,
@@ -592,9 +609,9 @@ export class Orchestrator {
       const p = c.tree.panelists.find((p) => p.id === r.panelistId)!;
       return (
         "You are " +
-        p.name +
+        (r.attribution?.panelist_name ?? p.name) +
         " (" +
-        p.role +
+        (r.attribution?.role ?? p.role) +
         ").\n\n" +
         c.get("dispatch", r.dispatchId).prompt_full
       );
@@ -616,6 +633,10 @@ export class Orchestrator {
       description: t.description,
       protocol: t.protocol_id,
       roster: t.panelists,
+      moderator: {
+        ...t.moderator,
+        ...input(input(t.metadata.codexhost ?? {}).moderator_display ?? {}),
+      },
       agendas,
       failed_slots: state(c.tree)
         .runs.filter((r) => r.status === "failed" || r.status === "cancelled")
@@ -636,7 +657,10 @@ export class Orchestrator {
             c.patch("sub_agenda", r.subAgendaId!, { status: "in_progress" });
         }
         const thread =
-          r.panelistId && ["critique", "rebuttal"].includes(r.roundType ?? "")
+          r.panelistId &&
+          s.panelist_threads[r.panelistId] &&
+          sameAssignment(s.panelist_threads[r.panelistId], r) &&
+          ["critique", "rebuttal"].includes(r.roundType ?? "")
             ? s.panelist_threads[r.panelistId]?.threadId
             : null;
         return {
@@ -709,7 +733,11 @@ export class Orchestrator {
             threadId: receipt.threadId,
             ...(receipt.turnId ? { turnId: receipt.turnId } : {}),
           });
-          if (r.panelistId)
+          if (
+            r.panelistId &&
+            (!s.panelist_threads[r.panelistId] ||
+              sameAssignment(s.panelist_threads[r.panelistId], r))
+          )
             s.panelist_threads[r.panelistId] = {
               threadId: receipt.threadId,
               harnessId: r.harnessId,
@@ -829,6 +857,7 @@ export class Orchestrator {
           {
             dispatch_id: r.dispatchId,
             panelist_id: r.panelistId,
+            ...r.attribution,
             round_number: r.roundNumber,
             kind: r.contributionKind,
             target_contribution_ids: r.targetContributionIds,
@@ -892,9 +921,11 @@ export class Orchestrator {
             "## 结论摘要",
             summary,
             "## 关键结论",
-            key_points.map((p) => "- " + p).join("\n") || "主持人未列出关键结论。",
+            key_points.map((p) => "- " + p).join("\n") ||
+              "主持人未列出关键结论。",
             "## 未决分歧",
-            open_disagreements.map((p) => "- " + p).join("\n") || "主持人未列出未决分歧。",
+            open_disagreements.map((p) => "- " + p).join("\n") ||
+              "主持人未列出未决分歧。",
           ].join("\n\n");
         }
         if (r.kind === "report" || r.publishReport)

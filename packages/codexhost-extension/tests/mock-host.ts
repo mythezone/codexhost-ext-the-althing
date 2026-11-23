@@ -26,6 +26,7 @@ export async function mockHost(t: TestContext) {
   await mkdir(dataDir, { recursive: true });
   const options = {
     infoDelay: 0,
+    inspections: null as Record<string, unknown> | null,
     emptyProjects: false,
     threadCwds: [] as string[],
     defaultWorkspace: "",
@@ -72,8 +73,17 @@ export async function mockHost(t: TestContext) {
           nextOffset: null,
         });
       case "/v1/harness/list":
-        return send({ harnesses: [{ id: "codex" }, { id: "other" }] });
+        return send({
+          harnesses: options.inspections
+            ? Object.keys(options.inspections)
+            : [{ id: "codex" }, { id: "other" }],
+        });
       case "/v1/harness/inspect":
+        if (options.inspections)
+          return send({
+            harnessId: body.harnessId,
+            inspection: options.inspections[body.harnessId],
+          });
         return send({
           harnessId: body.harnessId,
           inspection: {

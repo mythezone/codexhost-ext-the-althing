@@ -172,10 +172,10 @@ test("chat command selects a moderator, plans a topic via the backend, and waits
     );
     fireEvent.click(dialog.getByText("Continue"));
     const harness = await eventually(() => dialog.getByLabelText("Harness"));
-    await eventually(() => dialog.getByRole("option", {name: "codex"}), 6000);
+    await eventually(() => dialog.getByRole("option", {name: /^Codex · /}), 6000);
     fireEvent.change(harness, { target: { value: "codex" } });
     await eventually(() =>
-      dialog.getByRole("option", { name: /literal~fast/ }),
+      dialog.getByRole("option", { name: /literal · Fast/ }),
     );
     fireEvent.change(dialog.getByLabelText("Model"), {
       target: { value: "literal~fast" },

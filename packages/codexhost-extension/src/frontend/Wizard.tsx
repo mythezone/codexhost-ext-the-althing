@@ -1,196 +1,15 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useL, useWorkspace } from "./context";
 import { Modal } from "./ui";
 import { protocols } from "../backend/domain/protocols";
 import type { Topic } from "./types";
 
-type Ref = { id: string; serviceTier?: string };
-type Choice = {
-  id: string;
-  name: string;
-  role: string;
-  harnessId: string;
-  model: Ref | null;
-  thinking: string;
-};
-type Catalog = {
-  models: {
-    label?: string;
-    ref: Ref;
-    fastModel?: Ref;
-    supportedThinkingOptionIds?: string[];
-  }[];
-  thinkingOptions?: { id: string; label?: string }[];
-  defaultThinkingOptionId?: string;
-};
-const blank = (): Choice => ({
-  id: Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
-    b.toString(16).padStart(2, "0"),
-  ).join(""),
-  name: "",
-  role: "",
-  harnessId: "",
-  model: null,
-  thinking: "",
-});
-const modelName = (m: Ref | null) =>
-  m ? m.id + (m.serviceTier ? " · " + m.serviceTier : "") : "";
-function Picker({
-  value,
-  set,
-  ids,
-  cwd,
-  expert,
-}: {
-  value: Choice;
-  set: (p: Choice) => void;
-  ids: string[];
-  cwd: string;
-  expert: boolean;
-}) {
-  const l = useL(),
-    { rpc } = useWorkspace();
-  const [catalog, setCatalog] = useState<Catalog>(),
-    [error, setError] = useState("");
-  useEffect(() => {
-    let current = true;
-    setCatalog(undefined);
-    setError("");
-    if (value.harnessId)
-      rpc
-        .call<{ inspection: { catalog?: Catalog; error?: string } }>(
-          "codexhost/harness-inspect",
-          { harnessId: value.harnessId, ...(cwd ? { cwd } : {}) },
-        )
-        .then((r) => {
-          if (current) {
-            setCatalog(r.inspection.catalog);
-            if (!r.inspection.catalog)
-              setError(
-                r.inspection.error ||
-                  l("Catalog unavailable", "模型目录不可用"),
-              );
-          }
-        })
-        .catch((e) => {
-          if (current) setError(e.message);
-        });
-    return () => {
-      current = false;
-    };
-  }, [rpc, value.harnessId, cwd]);
-  const choices = (catalog?.models || []).flatMap((m) =>
-    [m.ref, m.fastModel].flatMap((ref, i) =>
-      ref
-        ? [
-            {
-              ref,
-              thinking: m.supportedThinkingOptionIds,
-              label:
-                (m.label || m.ref.id) +
-                (/ultrafast/.test(modelName(ref))
-                  ? " · Ultrafast"
-                  : i || /priority|~fast/.test(modelName(ref))
-                    ? " · Fast"
-                    : "") +
-                " (" +
-                modelName(ref) +
-                ")",
-            },
-          ]
-        : [],
-    ),
-  );
-  const selected = choices.find(
-    (o) => modelName(o.ref) === modelName(value.model),
-  );
-  const thinking = (catalog?.thinkingOptions || []).filter(
-    (o) => !selected?.thinking || selected.thinking.includes(o.id),
-  );
-  return (
-    <div className="form-grid">
-      {expert && (
-        <>
-          <label>
-            {l("Display name", "显示名称")}
-            <input
-              required
-              value={value.name}
-              onChange={(e) => set({ ...value, name: e.target.value })}
-            />
-          </label>
-          <label>
-            {l("Research role", "研究角色")}
-            <input
-              value={value.role}
-              onChange={(e) => set({ ...value, role: e.target.value })}
-            />
-          </label>
-        </>
-      )}
-      <label>
-        Harness
-        <select
-          aria-label="Harness"
-          required
-          value={value.harnessId}
-          onChange={(e) =>
-            set({
-              ...value,
-              harnessId: e.target.value,
-              model: null,
-              thinking: "",
-            })
-          }
-        >
-          <option value="">{l("Choose harness", "选择执行器")}</option>
-          {ids.map((id) => (
-            <option key={id}>{id}</option>
-          ))}
-        </select>
-      </label>
-      <label>
-        {l("Model", "模型")}
-        <select
-          aria-label={l("Model", "模型")}
-          value={modelName(value.model)}
-          onChange={(e) =>
-            set({
-              ...value,
-              model:
-                choices.find((o) => modelName(o.ref) === e.target.value)?.ref ??
-                null,
-              thinking: "",
-            })
-          }
-        >
-          <option value="">{l("Harness default", "执行器默认")}</option>
-          {choices.map((o) => (
-            <option key={modelName(o.ref)} value={modelName(o.ref)}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        {l("Thinking level", "推理强度")}
-        <select
-          aria-label={l("Thinking level", "推理强度")}
-          value={value.thinking}
-          onChange={(e) => set({ ...value, thinking: e.target.value })}
-        >
-          <option value="">{l("Default", "默认")}</option>
-          {thinking.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.label || o.id}
-            </option>
-          ))}
-        </select>
-      </label>
-      {error && <p role="alert">{error}</p>}
-    </div>
-  );
-}
+import {
+  assignments,
+  blank,
+  RosterFields,
+  type Seat as Choice,
+} from "./AgentPicker";
 type DraftAgenda = {
   title: string;
   subs: { title: string; execution_mode: string }[];
@@ -228,31 +47,10 @@ export function Wizard({
     [questions, setQuestions] = useState(""),
     [chair, setChair] = useState<Choice | null>(null),
     [agendas, plan] = useState<DraftAgenda[]>([]),
-    [ids, setIds] = useState<string[]>([]),
     [error, setError] = useState("");
-  useEffect(() => {
-    let live = true;
-    rpc
-      .call<{ harnesses: (string | { id: string })[] }>("codexhost/harnesses")
-      .then((r) => {
-        if (live)
-          setIds(r.harnesses.map((h) => (typeof h === "string" ? h : h.id)));
-      })
-      .catch((e) => {
-        if (live) setError(e.message);
-      });
-    return () => {
-      live = false;
-    };
-  }, [rpc]);
   function change(i: number, a: DraftAgenda) {
     plan(agendas.map((v, j) => (j === i ? a : v)));
   }
-  const config = (p: Choice) => ({
-    harnessId: p.harnessId,
-    model: p.model,
-    thinking: p.thinking,
-  });
   async function submit() {
     if (step < 2) {
       if (
@@ -271,6 +69,11 @@ export function Wizard({
       return;
     }
     const moderator = chair || (guided ? people[0] : undefined);
+    const selected = assignments(
+      people,
+      moderator ?? null,
+      l("Moderator", "主持人"),
+    );
     await perform(async () => {
       const topic = await rpc.call<Topic>("topics/create", {
         data: {
@@ -282,21 +85,8 @@ export function Wizard({
             .map((x) => x.trim())
             .filter(Boolean),
           protocol_id: protocol,
-          panelists: people.map((p) => ({
-            id: p.id,
-            name: p.name.trim(),
-            role: p.role,
-            model: modelName(p.model),
-            provider: p.harnessId,
-            reasoning_effort: p.thinking,
-          })),
-          moderator: moderator
-            ? {
-                name: l("Moderator", "主持人"),
-                model: modelName(moderator.model),
-                provider: moderator.harnessId,
-              }
-            : {},
+          panelists: selected.panelists,
+          moderator: selected.moderator,
           metadata: {
             codexhost: {
               project_cwd: cwd.trim(),
@@ -304,10 +94,7 @@ export function Wizard({
                 projects.find((p) => p.cwd === cwd)?.name ||
                 cwd.split(/[\\/]/).filter(Boolean).pop() ||
                 "",
-              panelist_threads: Object.fromEntries(
-                people.map((p) => [p.id, config(p)]),
-              ),
-              moderator_config: moderator ? config(moderator) : null,
+              ...selected.host,
             },
           },
           agendas: askModerator
@@ -373,9 +160,24 @@ export function Wizard({
                 onChange={(e) => {
                   setCwd(e.target.value);
                   roster(
-                    people.map((p) => ({ ...p, model: null, thinking: "" })),
+                    people.map((p) => ({
+                      ...p,
+                      harnessId: "",
+                      model: null,
+                      thinking: "",
+                      modelLabel: "",
+                      thinkingLabel: "",
+                    })),
                   );
-                  if (chair) setChair({ ...chair, model: null, thinking: "" });
+                  if (chair)
+                    setChair({
+                      ...chair,
+                      harnessId: "",
+                      model: null,
+                      thinking: "",
+                      modelLabel: "",
+                      thinkingLabel: "",
+                    });
                 }}
                 placeholder={l(
                   "Choose or enter a workspace path",
@@ -474,53 +276,7 @@ export function Wizard({
                 )}
               </p>
             )}
-            {people.map((p, i) => (
-              <fieldset key={p.id}>
-                <legend>
-                  {l("Expert", "专家")} {i + 1}
-                </legend>
-                <Picker
-                  expert
-                  value={p}
-                  ids={ids}
-                  cwd={cwd}
-                  set={(v) =>
-                    roster(people.map((q) => (q.id === p.id ? v : q)))
-                  }
-                />
-                <button
-                  type="button"
-                  onClick={() => roster(people.filter((q) => q.id !== p.id))}
-                >
-                  {l("Remove expert", "移除专家")}
-                </button>
-              </fieldset>
-            ))}
-            <button
-              type="button"
-              onClick={() =>
-                roster([...people, guided ? expert(people.length) : blank()])
-              }
-            >
-              + {l("Add expert", "添加专家")}
-            </button>
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={!!chair}
-                onChange={(e) => setChair(e.target.checked ? blank() : null)}
-              />
-              {l("Configure moderator", "配置主持人")}
-            </label>
-            {chair && (
-              <Picker
-                expert={false}
-                value={chair}
-                set={setChair}
-                ids={ids}
-                cwd={cwd}
-              />
-            )}
+            <RosterFields {...{ cwd, people, roster, chair, setChair }} />
           </>
         )}
         {step === 2 && guided && (

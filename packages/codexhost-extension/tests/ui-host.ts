@@ -160,6 +160,40 @@ export function mockUI() {
                 { cwd: "/other", name: "Other" },
               ],
             };
+          case "codexhost/agents":
+            return {
+              agents: ["codex", "other", "missing"].map((id) => ({
+                id,
+                label: id === "codex" ? "Codex" : id,
+                section: "auto",
+                configuredForDelegation: id === "codex",
+                status: id === "missing" ? "unavailable" : "ready",
+                statusMessage: id === "missing" ? "Login required" : "",
+                defaultModel: { id: "sol" },
+                defaultThinking: "high",
+                defaultThinkingLabel: "High",
+                models: [
+                  {
+                    label: "Sol",
+                    resolvedModelLabel: "",
+                    ref: { id: "sol" },
+                    fastModel: { id: "sol~fast" },
+                    supportedThinkingOptionIds: ["high"],
+                  },
+                  {
+                    label: "Lite",
+                    resolvedModelLabel: "",
+                    ref: { id: "lite" },
+                    fastModel: null,
+                    supportedThinkingOptionIds: ["low"],
+                  },
+                ],
+                thinkingOptions: [
+                  { id: "high", label: "High" },
+                  { id: "low", label: "Low" },
+                ],
+              })),
+            };
           case "codexhost/harnesses":
             return { harnesses: ["codex", { id: "other" }] };
           case "codexhost/harness-inspect":
@@ -181,6 +215,10 @@ export function mockUI() {
           case "topics/list":
             return [{ ...toCard(c.tree), activeRunCount: 1 }, other];
           case "topics/get":
+            return topic;
+          case "topics/update":
+            c.patch("topic", topic.id, p.patch);
+            topic = hydrate(c.tree);
             return topic;
           case "topics/create": {
             const next = new Council();

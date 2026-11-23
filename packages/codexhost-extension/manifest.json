@@ -1,7 +1,7 @@
 {
   "manifestVersion": 2,
   "id": "the-althing",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "name": {
     "en": "The Althing",
     "zh-CN": "议事厅"
@@ -11,8 +11,8 @@
     "zh-CN": "在 CodexHost 项目中召集专家议会并发布研究结论。"
   },
   "details": {
-    "en": "### Inside the council\n\n- Start with `/althing` in Desktop or Web chat. Ask the moderator to propose an agenda for your topic.\n- Convene a panel from the harnesses and models available on your Host. Give each expert a role and choose a moderator.\n- Follow opening statements, peer critiques and rebuttals in the agenda discussion. Open a delegated thread to inspect its work.\n- Publish agenda conclusions and final reports. Download a standalone publication or transfer the complete council as a portable ZIP.",
-    "zh-CN": "### 在议事厅中\n\n- 在桌面或网页聊天框输入 `/althing` 发起会议，可请主持模型按主题拟订议程。\n- 从本机可用的智能体和模型中选出专家与主持人，为每位专家指定研究角色。\n- 按议程跟进独立分析、交叉质询与反驳，打开子会话查看实时进展。\n- 发布议程结论和总报告，下载独立出版物，或通过 ZIP 在不同主机之间迁移完整议题。"
+    "en": "### Inside the council\n\n- Start with `/althing` in Desktop or Web chat. Ask the moderator to propose an agenda for your topic.\n- Convene a panel from the harnesses and models available on your Host. Pick the Host’s collaboration defaults or assign agents, models, thinking levels and roles in the wizard or expert roster.\n- Follow opening statements, peer critiques and rebuttals in the agenda discussion. Open a delegated thread to inspect its work.\n- Publish agenda conclusions and final reports. Download a standalone publication or transfer the complete council as a portable ZIP.",
+    "zh-CN": "### 在议事厅中\n\n- 在桌面或网页聊天框输入 `/althing` 发起会议，可请主持模型按主题拟订议程。\n- 从本机可用的智能体和模型中选出专家与主持人，可一键加入已就绪的协作专家，也可在向导或专家名册中手动配置 Agent、模型、推理强度和会议角色。\n- 按议程跟进独立分析、交叉质询与反驳，打开子会话查看实时进展。\n- 发布议程结论和总报告，下载独立出版物，或通过 ZIP 在不同主机之间迁移完整议题。"
   },
   "author": "mythezone",
   "categories": ["workflow", "tools"],

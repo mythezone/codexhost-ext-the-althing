@@ -12,6 +12,7 @@ import { useL, useWorkspace } from "./context";
 import TopicNavigation from "./TopicNavigation";
 import { Discussion, type Target } from "./Discussion";
 import { DispatchDialog, QuickEdit, Runs } from "./Controls";
+import { RosterEditor } from "./RosterEditor";
 import { ReportReader } from "./ReportReader";
 import { Markdown, Points, Meter, Status, expertColor } from "./ui";
 import "./plugins/builtins";
@@ -134,6 +135,11 @@ export function TopicPage({
             <details className="action-menu">
               <summary>{l("Council actions", "议题操作")}</summary>
               <div className="panel tools">
+                {t.status !== "archived" && (
+                  <button onClick={() => show("roles")}>
+                    {l("Configure roles & agents", "配置专家与角色")}
+                  </button>
+                )}
                 <button
                   disabled={busy}
                   onClick={() => call("council/plan-topic")}
@@ -301,7 +307,7 @@ export function TopicPage({
           />
         </>
       )}
-      {Extra && <Extra topic={t} />}
+      {Extra && <Extra topic={t} configure={() => show("roles")} />}
       <Runs topic={t} sub={s} />
       {(reports.length > 0 || tab === "final") && (
         <section className="panel">
@@ -337,7 +343,9 @@ export function TopicPage({
           </div>
         </section>
       )}
-      {dialog === "dispatch" && s ? (
+      {dialog === "roles" ? (
+        <RosterEditor topic={t} close={() => show("")} />
+      ) : dialog === "dispatch" && s ? (
         <DispatchDialog topic={t} sub={s} close={() => show("")} />
       ) : (
         dialog && (

@@ -1,3 +1,4 @@
+import { sameAssignment } from "../shared/agents.ts";
 import { z } from "zod";
 import { jsonBytes } from "./json-bytes.ts";
 import { Store, resolveDataDir, archivePath } from "./storage.ts";
@@ -20,6 +21,7 @@ const handlers = [
   "codexhost/status",
   "codexhost/projects",
   "codexhost/threads",
+  "codexhost/agents",
   "codexhost/harnesses",
   "codexhost/harness-inspect",
   "topics/list",
@@ -72,6 +74,10 @@ const hostConfig = z
     project_label: z.string().optional(),
     panelist_threads: z.record(id, configs).optional(),
     moderator_config: configs.nullable().optional(),
+    moderator_display: z
+      .object({ role: z.string(), reasoning_effort: z.string() })
+      .nullable()
+      .optional(),
   })
   .strict();
 function metadata(value: unknown, existing?: Json) {
@@ -79,6 +85,28 @@ function metadata(value: unknown, existing?: Json) {
     previous = existing ? input(existing) : {};
   if (data.codexhost !== undefined) {
     const host = hostConfig.parse(data.codexhost);
+    if (existing) {
+      const keepThread = (next: z.infer<typeof configs>, old: unknown) => {
+        const prior = configs.safeParse(old);
+        if (prior.success && sameAssignment(prior.data, next))
+          return { ...prior.data, threadId: prior.data.threadId ?? null };
+        return { ...next, threadId: null };
+      };
+      if (host.panelist_threads) {
+        const previousSeats = input(previous.panelist_threads ?? {});
+        host.panelist_threads = Object.fromEntries(
+          Object.entries(host.panelist_threads).map(([id, next]) => [
+            id,
+            keepThread(next, previousSeats[id]),
+          ]),
+        );
+      }
+      if (host.moderator_config)
+        host.moderator_config = keepThread(
+          host.moderator_config,
+          previous.moderator_config,
+        );
+    }
     data.codexhost = json.parse({
       ...previous,
       ...host,
@@ -138,6 +166,16 @@ export async function engine(
             .strict()
             .parse(p),
         );
+      case "codexhost/agents": {
+        const { cwd, refresh } = z
+          .object({
+            cwd: z.string().optional(),
+            refresh: z.boolean().optional(),
+          })
+          .strict()
+          .parse(p);
+        return bridge.listAgents(cwd, refresh);
+      }
       case "codexhost/harnesses":
         return bridge.listHarnesses();
       case "codexhost/harness-inspect":
@@ -189,7 +227,15 @@ export async function engine(
         return store.transaction(tid(), (c) => {
           const data = { ...input(p.patch ?? p.data) };
           if (data.metadata !== undefined)
-            data.metadata = metadata(data.metadata, c.tree.metadata.codexhost);
+            data.metadata = {
+              ...c.tree.metadata,
+              ...metadata(data.metadata, c.tree.metadata.codexhost),
+            };
+          if (
+            c.tree.status === "archived" &&
+            (data.panelists || data.moderator)
+          )
+            throw Error("Archived council roles are read-only");
           c.patch("topic", tid(), data);
           return hydrate(c.tree);
         });

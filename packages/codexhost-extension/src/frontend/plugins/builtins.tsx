@@ -1,3 +1,5 @@
+import { hostRoster } from "../AgentPicker";
+import { thinkingLabel } from "../../shared/agents";
 import { useL } from "../context";
 import { ShieldCheck, Users } from "lucide-react";
 import { plugins } from "./registry";
@@ -36,8 +38,8 @@ export function Roster({ people }: { people: Expert[] }) {
               {[
                 p.name,
                 p.model,
-                p.subscription,
-                p.reasoning_effort,
+                p.subscription || p.provider,
+                thinkingLabel(p.reasoning_effort),
                 p.role,
               ].map((v, i) => (
                 <td key={i}>
@@ -63,15 +65,41 @@ export function Roster({ people }: { people: Expert[] }) {
 plugins.register("tabs", {
   id: "roster",
   label: "专家名册",
-  component: ({ topic }) => (
-    <section className="panel">
-      <h2>
-        <Users />
-        {useL()("Expert roster", "专家名册")}
-      </h2>
-      <Roster people={topic.panelists} />
-    </section>
-  ),
+  component: ({ topic, configure }) => {
+    const l = useL(),
+      host = hostRoster(topic);
+    return (
+      <section className="panel">
+        <h2>
+          <Users />
+          {l("Expert roster", "专家名册")}
+        </h2>
+        {topic.status !== "archived" && (
+          <button onClick={configure}>
+            {l("Configure roles & agents", "配置专家与角色")}
+          </button>
+        )}
+        <p>
+          <strong>{l("Moderator", "主持人")}</strong> ·{" "}
+          {[
+            topic.moderator.provider ||
+              host.moderator_config?.harnessId ||
+              l("Host default", "宿主默认"),
+            topic.moderator.model,
+            thinkingLabel(
+              host.moderator_display?.reasoning_effort ||
+                host.moderator_config?.thinking ||
+                "",
+            ),
+            host.moderator_display?.role,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+        <Roster people={topic.panelists} />
+      </section>
+    );
+  },
 });
 plugins.register("contributions", {
   id: "verification",

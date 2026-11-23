@@ -92,9 +92,28 @@ test("New Council wizard uses workspace, advertised fast model, supported thinki
       await eventually(() => wizard.getByText("Add expert", { exact: false })),
     );
     await field("Display name", "Reviewer");
+    await field("Role preset", "General review");
+    assert.equal(
+      (wizard.getByLabelText("Research role") as HTMLInputElement).value,
+      "General review",
+    );
     await field("Research role", "Analyst");
+    await eventually(() => wizard.getByRole("option", { name: /^Codex · / }));
+    assert.ok(
+      (
+        wizard.getByRole("option", {
+          name: /missing · Login required/,
+        }) as HTMLOptionElement
+      ).disabled,
+    );
     await field("Harness", "codex");
     await eventually(() => wizard.getByRole("option", { name: /Fast/ }));
+    await field("Model", "lite");
+    assert.equal(
+      (wizard.getByLabelText("Thinking level") as HTMLSelectElement).value,
+      "low",
+    );
+    assert.ok(!wizard.queryByRole("option", { name: "High" }));
     await field("Model", "sol~fast");
     await field("Thinking level", "high");
     await eventually(() => !wizard.queryByRole("option", { name: "low" }));
@@ -121,6 +140,8 @@ test("New Council wizard uses workspace, advertised fast model, supported thinki
       data.metadata.codexhost.panelist_threads[data.panelists[0].id],
       { harnessId: "codex", model: { id: "sol~fast" }, thinking: "high" },
     );
+    assert.equal(data.panelists[0].reasoning_effort, "High");
+    assert.equal(data.panelists[0].role, "Analyst");
     assert.equal(data.agendas[0].sub_agendas[0].execution_mode, "sequential");
     await eventually(() =>
       ui.getByRole("heading", { name: "Methods review", level: 1 }),
@@ -531,6 +552,73 @@ test("an event refreshes the cached topic without replacing the current workspac
     );
   } finally {
     resume.resolve();
+    dispose();
+  }
+});
+
+test("edit an existing roster, add collaboration defaults, choose roles and save a separate moderator", async (t) => {
+  dom(t);
+  const h = mockUI(),
+    root = document.createElement("div");
+  document.body.append(root);
+  const dispose = await mount(root, h.api);
+  try {
+    const ui = await eventually(() => query(root));
+    fireEvent.click(
+      await eventually(
+        () => ui.getAllByRole("button", { name: "Enter council" })[0],
+      ),
+    );
+    fireEvent.click(
+      await eventually(() => ui.getByRole("button", { name: "Expert roster" })),
+    );
+    fireEvent.click(
+      await eventually(() =>
+        ui.getByRole("button", { name: "Configure roles & agents" }),
+      ),
+    );
+    const dlg = within(await eventually(() => ui.getByRole("dialog")));
+    await eventually(() =>
+      dlg.getByRole("button", { name: /^Codex · Sol · High/ }),
+    );
+    // Both existing seats are assigned. Change the first one, then add the missing collaboration expert.
+    fireEvent.change(dlg.getAllByLabelText("Harness")[0], {
+      target: { value: "other" },
+    });
+    fireEvent.click(
+      dlg.getByRole("button", { name: "Add collaboration experts" }),
+    );
+    await eventually(() => dlg.getAllByLabelText("Display name").length === 3);
+    assert.equal(
+      (dlg.getAllByLabelText("Display name")[2] as HTMLInputElement).value,
+      "Codex",
+    );
+    fireEvent.change(dlg.getAllByLabelText("Role preset")[2], {
+      target: { value: "Architecture & technical design" },
+    });
+    fireEvent.change(dlg.getAllByLabelText("Harness")[3], {
+      target: { value: "other" },
+    });
+    fireEvent.change(dlg.getAllByLabelText("Research role")[3], {
+      target: { value: "Independent chair" },
+    });
+    fireEvent.click(dlg.getByRole("button", { name: "Save roles" }));
+    const saved = (
+      await eventually(() => h.calls.find((c) => c.method === "topics/update"))
+    ).p.patch;
+    assert.equal(saved.panelists[2].reasoning_effort, "High");
+    assert.equal(saved.panelists[2].role, "Architecture & technical design");
+    assert.equal(
+      saved.metadata.codexhost.moderator_display.role,
+      "Independent chair",
+    );
+    assert.equal(saved.metadata.codexhost.moderator_config.thinking, "high");
+    await eventually(() =>
+      ui
+        .getByRole("table")
+        .textContent?.includes("Architecture & technical design"),
+    );
+  } finally {
     dispose();
   }
 });
