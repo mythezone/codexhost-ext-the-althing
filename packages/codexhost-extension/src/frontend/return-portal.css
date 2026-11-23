@@ -1,0 +1,56 @@
+.council-venue .venue-return-portal {
+  position: absolute;
+  inset-block-start: clamp(10px, 1.4cqw, 20px);
+  inset-inline-start: clamp(12px, 4.5cqw, 68px);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--venue-ink);
+  touch-action: manipulation;
+}
+
+.venue-return-portal .venue-gate-art {
+  width: clamp(56px, 6.5cqw, 86px);
+}
+
+.venue-return-sign {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: -4px;
+  padding: 3px 7px;
+  border: 1px solid var(--venue-accent);
+  border-radius: 7px;
+  box-shadow: 0 2px 0 #31506c36;
+  background: var(--venue-stone);
+  color: var(--venue-accent);
+  font-size: clamp(11px, 1cqw, 14px);
+  line-height: 1.25;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+@container (max-width: 600px) {
+  .council-venue .venue-return-portal {
+    inset-block-start: 4px;
+    inset-inline-start: 6px;
+    flex-direction: row;
+  }
+  .venue-return-portal .venue-gate-art {
+    width: 30px;
+  }
+  .venue-return-sign {
+    margin-inline-start: -2px;
+    margin-top: 0;
+    padding: 3px 4px;
+  }
+  .venue-return-sign > svg {
+    display: none;
+  }
+}

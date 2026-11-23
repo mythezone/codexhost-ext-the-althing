@@ -1,0 +1,85 @@
+.agent-avatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  border: 1px solid color-mix(in srgb, var(--avatar-fill) 70%, #263c5d);
+  border-radius: 32% 38% 35% 31%;
+  background: var(--avatar-fill);
+  color: #263653;
+  font-size: calc(var(--avatar-size) * .47);
+  font-weight: 800;
+  line-height: 1;
+}
+.agent-avatar > img { display: block; width: 62%; height: 62%; object-fit: contain; }
+.agent-chair-pin {
+  position: absolute;
+  right: -10%;
+  bottom: -9%;
+  display: grid;
+  place-items: center;
+  width: 48%;
+  height: 48%;
+  color: #603e09;
+  background: #ffdb78;
+  border: 1.5px solid var(--card);
+  border-radius: 50%;
+}
+.agent-chair-pin svg { width: 74%; height: 74%; stroke-width: 2.4; }
+
+.discussion .response, .discussion .dispatch {
+  min-width: 0;
+  padding: clamp(14px, 1.9vw, 26px);
+}
+.discussion .dispatch {
+  background: color-mix(in srgb, var(--live-fill) 12%, var(--card));
+  border-color: color-mix(in srgb, var(--live-fill) 40%, var(--edge));
+}
+.speech-identity { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.speech-byline { min-width: 0; overflow-wrap: anywhere; }
+.speech-author { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+.speech-author strong { font-size: 1rem; line-height: 1.4; }
+.speech-meta { display: block; margin-top: 2px; font-size: .78rem; color: var(--muted); }
+.speech-role, .stance-tags li {
+  display: inline-flex;
+  align-items: baseline;
+  max-width: 100%;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: .76rem;
+  line-height: 1.5;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+  border-radius: 7px;
+}
+.speech-role {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--expert, var(--primary)) 10%, var(--card));
+}
+.speech-role svg, .stance-tags svg { flex: none; align-self: center; }
+.chair-role { background: color-mix(in srgb, var(--live-fill) 43%, var(--card)); }
+.dispatch-copy h3 { margin: 0 0 5px; }
+.discussion .response { border-inline-start: 4px solid var(--expert, var(--primary)); }
+.response-body { display: flow-root; min-width: 0; }
+.response-body > .prose > :first-child { margin-top: 0; }
+.response-points {
+  margin: 10px 0 0;
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--done-fill) 14%, var(--card));
+  border-radius: 10px;
+}
+.response-points > strong { font-size: .86rem; }
+.stance-tags { display: flex; flex-wrap: wrap; gap: 5px 7px; margin: 12px 0 0; padding: 0; list-style: none; }
+.stance-tags li { background: var(--soft); color: var(--muted); }
+.discussion .fold { min-width: 0; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+.discussion .fold > button { min-height: 32px; }
+.response .reply { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 560px) {
+  .speech-identity { gap: 9px; margin-bottom: 11px; }
+  .speech-role { font-size: .72rem; }
+  .speech-meta { font-size: .75rem; }
+  .response-points { padding: 9px 10px; }
+}

@@ -1,0 +1,434 @@
+.council-head {
+  width: min(100%, var(--content-width));
+  margin-inline: auto;
+  padding: 14px var(--page-inset) 12px;
+  color: var(--ink);
+}
+.council-breadcrumb,
+.council-head-actions,
+.council-activity-row,
+.council-dial,
+.council-navigation,
+.council-nav,
+.council-view-switch {
+  display: flex;
+  align-items: center;
+}
+.council-breadcrumb {
+  gap: 9px;
+  min-height: 30px;
+}
+.council-breadcrumb > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  text-decoration: none;
+  font-weight: 750;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.council-breadcrumb > a:hover {
+  color: var(--primary);
+}
+.council-breadcrumb .status {
+  flex: none;
+  white-space: nowrap;
+  min-width: max-content;
+}
+.crumb-divider {
+  color: var(--edge);
+}
+.council-head-actions {
+  margin-inline-start: auto;
+  justify-content: flex-end;
+  gap: 0.42rem;
+  flex-wrap: wrap;
+}
+.council-head-actions button {
+  min-height: 30px;
+  font-size: 0.83rem;
+  padding: 4px 9px;
+}
+.council-head h1 {
+  margin: 0.35rem 0 0.18rem;
+  font-size: clamp(1.42rem, 2.25vw, 2.25rem);
+  line-height: 1.22;
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+}
+.council-activity-row {
+  column-gap: 11px;
+  margin-block: 5px 12px;
+  align-items: flex-start;
+}
+.council-dial {
+  flex: none;
+  gap: 3px;
+  min-height: 25px;
+  font-size: 0.84rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.council-dial svg {
+  width: 24px;
+  height: 24px;
+}
+.dial-fill {
+  transition: stroke-dasharray 0.4s ease-out;
+}
+button.council-activity {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) 16px;
+  justify-content: start;
+  align-content: center;
+  gap: 7px;
+  flex: 0 1 auto;
+  min-width: 0;
+  min-height: 25px;
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+  font-weight: 550;
+  font-size: 0.84rem;
+}
+.activity-label {
+  font-weight: 750;
+  color: var(--ink);
+}
+.council-activity .activity-copy {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.council-activity[aria-expanded="true"] .activity-copy {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.council-activity[aria-expanded="true"] > svg {
+  transform: rotate(180deg);
+}
+.council-navigation {
+  justify-content: space-between;
+  gap: 10px 15px;
+  flex-wrap: wrap;
+  padding-top: 5px;
+  border-block-end: 1px solid var(--line);
+}
+.council-nav {
+  flex-wrap: wrap;
+  gap: 2px 5px;
+  min-width: 0;
+}
+.council-nav .council-nav-link,
+.council-agendas > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 9px 9px 0 0;
+  position: relative;
+  min-height: 43px;
+  padding: 4px 12px 8px;
+  gap: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 740;
+  cursor: pointer;
+  white-space: nowrap;
+  list-style: none;
+}
+.council-agendas summary::-webkit-details-marker {
+  display: none;
+}
+.council-nav-link > svg {
+  flex: none;
+}
+.council-nav .council-nav-link[aria-current="page"],
+.council-agendas > .chosen-agenda {
+  color: var(--primary);
+  background: linear-gradient(0deg, var(--wash), transparent 92%);
+}
+.council-nav-link[aria-current="page"]::after,
+.chosen-agenda::after {
+  content: "";
+  position: absolute;
+  inset: auto 12% -1px;
+  height: 3px;
+  border-radius: 4px;
+  background: var(--primary);
+}
+.council-nav .council-nav-link:hover,
+.council-agendas > summary:hover {
+  color: var(--primary);
+  background: var(--wash);
+}
+.council-nav-link:hover .temple-roof,
+.council-nav-link:focus-visible .temple-roof {
+  animation: temple-lift 0.45s ease-out;
+}
+@keyframes temple-lift {
+  40% {
+    transform: translateY(-2px);
+  }
+}
+.council-agendas {
+  position: relative;
+  margin: 0;
+}
+.council-agendas summary small,
+.council-agenda-list small {
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+.council-agendas summary small {
+  max-width: 5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--soft);
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+.council-agendas[open] summary > svg:last-child {
+  transform: rotate(180deg);
+}
+.council-agenda-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: min(460px, 80vw);
+  max-height: min(420px, 55svh);
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--edge);
+  border-radius: 13px;
+  padding: 6px;
+  box-shadow: 0 12px 26px var(--shadow);
+  z-index: 12;
+}
+.council-agenda-list button {
+  display: grid;
+  grid-template-columns: 35px minmax(0, 1fr) auto;
+  gap: 9px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 0;
+  text-align: start;
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+.council-agenda-list [aria-current="page"] {
+  background: var(--wash);
+  color: var(--primary);
+}
+.agenda-letter {
+  display: inline-grid;
+  place-items: center;
+  max-width: 35px;
+  min-height: 25px;
+  background: var(--soft);
+  border-radius: 7px;
+  font-size: 0.78rem;
+}
+.council-view-switch {
+  gap: 2px;
+  border: 1px solid var(--line);
+  background: var(--soft);
+  padding: 2px;
+  border-radius: 11px;
+  margin-bottom: 5px;
+}
+.council-view-switch button {
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.council-view-switch button[aria-pressed="true"] {
+  color: var(--ink);
+  background: var(--card);
+  border-color: var(--line);
+  box-shadow: 0 1px 3px var(--shadow);
+}
+.council-sub-picker {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-block: 8px;
+  min-width: 0;
+}
+.council-sub-picker label {
+  flex: none;
+  font-weight: 750;
+}
+.council-sub-picker select {
+  max-width: 100%;
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--card);
+  font: inherit;
+}
+.meeting-records {
+  margin-top: 16px;
+}
+.meeting-records > summary {
+  cursor: pointer;
+  color: var(--primary);
+  font-size: 1rem;
+  font-weight: 750;
+  padding: 10px 0;
+}
+@media (max-width: 760px) {
+  .council-head {
+    padding-block: 9px 6px;
+  }
+  .council-navigation {
+    gap: 4px 8px;
+  }
+  .council-nav {
+    gap: 1px;
+  }
+  .council-nav .council-nav-link,
+  .council-agendas > summary {
+    padding-inline: 7px;
+    font-size: 0.84rem;
+    min-height: 39px;
+  }
+  .council-head-actions button {
+    padding: 3px 6px;
+  }
+  .council-head h1 {
+    margin-block: 6px;
+  }
+  .council-activity-row {
+    margin-bottom: 3px;
+  }
+}
+@media (max-width: 590px) {
+  .council-navigation {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .council-view-switch {
+    grid-row: 1;
+    justify-self: end;
+    margin: 0;
+  }
+  .council-agenda-list {
+    left: max(-62px, -18vw);
+    width: min(86vw, 460px);
+  }
+  .council-nav {
+    justify-content: space-between;
+  }
+  .council-breadcrumb {
+    flex-wrap: wrap;
+  }
+  .council-head-actions {
+    gap: 3px;
+  }
+  .council-nav-link > svg {
+    width: 16px;
+  }
+  .council-nav-link:first-child > svg {
+    width: 24px;
+  }
+  .council-view-switch button {
+    min-height: 28px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dial-fill {
+    transition: none;
+  }
+  .council-nav-link:hover .temple-roof,
+  .council-nav-link:focus-visible .temple-roof {
+    animation: none;
+  }
+}
+@media print {
+  .council-breadcrumb,
+  .council-navigation,
+  .council-sub-picker,
+  .meeting-records > summary {
+    display: none;
+  }
+  .council-head {
+    padding: 0;
+  }
+}
+.agenda-outline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+.agenda-outline > .panel {
+  min-width: 0;
+  margin-bottom: 0;
+}
+.agenda-outline .agenda-intro {
+  display: grid;
+  align-items: center;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  grid-template-areas: "art title progress" "art objective objective";
+  gap: 2px 12px;
+  padding: 10px 15px;
+}
+.agenda-outline .agenda-art {
+  object-fit: contain;
+  grid-area: art;
+  width: 36px;
+  height: 38px;
+}
+.agenda-outline .agenda-intro h2 {
+  grid-area: title;
+  display: block;
+  margin: 0;
+  font-size: clamp(1rem, 1.35vw, 1.25rem);
+}
+.agenda-code {
+  display: inline-block;
+  margin-inline-end: .5em;
+  padding: .1em .45em;
+  border-radius: 5px;
+  background: var(--wash);
+  color: var(--primary);
+  font-size: .76em;
+  vertical-align: .06em;
+}
+.agenda-intro .agenda-progress {
+  grid-area: progress;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.agenda-progress .meter { width: clamp(76px, 10vw, 136px); }
+.agenda-outline .agenda-intro > .prose {
+  grid-area: objective;
+  font-size: .9rem;
+}
+.agenda-intro > .prose > :first-child { margin-top: 0; }
+.agenda-intro > .prose > :last-child { margin-bottom: 0; }
+@media (max-width: 620px) {
+  .agenda-outline .agenda-intro {
+    grid-template-columns: 28px minmax(0, 1fr);
+    grid-template-areas: "art title" "progress progress" "objective objective";
+    gap: 6px 8px;
+    padding: 10px 12px;
+  }
+  .agenda-outline .agenda-art { width: 28px; height: 28px; }
+}
+.agenda-records,
+.agenda-records > .discussion {
+  min-width: 0;
+}

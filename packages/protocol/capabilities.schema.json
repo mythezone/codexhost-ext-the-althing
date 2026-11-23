@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "capabilities",
+  "type": "object",
+  "properties": {
+    "service": {
+      "const": "the-althing"
+    },
+    "api_version": {
+      "type": "string"
+    },
+    "protocol_version": {
+      "type": "string"
+    },
+    "skills_distributed_by_server": {
+      "const": false
+    },
+    "public_base_url": {
+      "type": "string"
+    },
+    "auth": {
+      "type": "object",
+      "properties": {
+        "read_requires_key": {
+          "type": "boolean"
+        },
+        "write_requires_key": {
+          "type": "boolean"
+        },
+        "header": {
+          "type": "string"
+        },
+        "alternative_header": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "read_requires_key",
+        "write_requires_key",
+        "header",
+        "alternative_header"
+      ]
+    },
+    "features": {
+      "type": "object",
+      "properties": {
+        "live_sse": {
+          "type": "boolean"
+        },
+        "agenda_hierarchy": {
+          "type": "boolean"
+        },
+        "parallel_sub_agendas": {
+          "type": "boolean"
+        },
+        "peer_critique_rounds": {
+          "type": "boolean"
+        },
+        "summary_with_expandable_fulltext": {
+          "type": "boolean"
+        },
+        "agenda_reports": {
+          "type": "boolean"
+        },
+        "final_reports": {
+          "type": "boolean"
+        },
+        "standalone_html_reports": {
+          "type": "boolean"
+        },
+        "archive_export": {
+          "type": "boolean"
+        },
+        "archive_import": {
+          "type": "boolean"
+        },
+        "runtime_themes": {
+          "type": "boolean"
+        },
+        "plugin_registry": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "live_sse",
+        "agenda_hierarchy",
+        "parallel_sub_agendas",
+        "peer_critique_rounds",
+        "summary_with_expandable_fulltext",
+        "agenda_reports",
+        "final_reports",
+        "standalone_html_reports",
+        "archive_export",
+        "archive_import",
+        "runtime_themes",
+        "plugin_registry"
+      ]
+    },
+    "protocols": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "recommended_rounds": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "default_phases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "schema_hints": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "recommended_rounds",
+          "default_phases",
+          "schema_hints"
+        ]
+      }
+    },
+    "exporters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "media_type": {
+            "type": "string"
+          },
+          "extension": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "media_type",
+          "extension"
+        ]
+      }
+    },
+    "report_renderers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "format"
+        ]
+      }
+    },
+    "themes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      }
+    },
+    "endpoints": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "method",
+          "path"
+        ]
+      }
+    }
+  },
+  "required": [
+    "service",
+    "api_version",
+    "protocol_version",
+    "skills_distributed_by_server",
+    "public_base_url",
+    "auth",
+    "features",
+    "protocols",
+    "exporters",
+    "report_renderers",
+    "themes",
+    "endpoints"
+  ]
+}

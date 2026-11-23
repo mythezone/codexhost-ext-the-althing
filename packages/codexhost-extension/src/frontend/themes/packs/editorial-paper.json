@@ -1,0 +1,22 @@
+{
+  "id": "editorial-paper",
+  "name": "Editorial Paper",
+  "scheme": "light",
+  "tokens": {
+    "canvas": "#ffffff",
+    "card": "#ffffff",
+    "ink": "#10254c",
+    "muted": "#536783",
+    "line": "#c7d4e7",
+    "primary": "#1356ed",
+    "wash": "#eaf3ff",
+    "live": "#825300",
+    "live-fill": "#ffd45b",
+    "done": "#17664f",
+    "done-fill": "#75d6aa",
+    "soft": "#f3f7fe",
+    "shadow": "#9caee430",
+    "edge": "#8398b7",
+    "action": "#1356ed"
+  }
+}

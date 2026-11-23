@@ -1,0 +1,97 @@
+.venue-plaque {
+  position: absolute;
+  top: 49%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(32%, 450px);
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  padding: 15px clamp(8px, 1.25cqw, 18px) 8px;
+  border: 2px solid #3d5372;
+  border-radius: 12px 12px 16px 16px;
+  background: linear-gradient(145deg,#fffef5 16%,#fffdf3 61%,#f7ecd1);
+  box-shadow: inset 0 0 0 3px #fff9e3, inset 0 0 0 4px #d8b978, 0 4px 0 #bdab86, 0 6px 0 #536578;
+  color: #1b3453;
+  text-align: center;
+  pointer-events: none;
+}
+.plaque-laurel {
+  position: absolute;
+  width: 59px;
+  height: 22px;
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding-inline: 6px;
+  border-radius: 100%;
+  background: #fff9e3;
+}
+.venue-plaque h3 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  margin: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+  font-size: clamp(15px,1.85cqw,26px);
+  line-height: 1.22;
+}
+.venue-plaque .plaque-participants {
+  max-width: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: clamp(4px,1cqw,12px);
+  pointer-events: auto;
+  padding: 4px 7px 3px;
+  border: 1px solid #d1c9a9;
+  background: #fffdf7;
+  color: #365368;
+  border-radius: 10px;
+}
+.venue-plaque .plaque-participants:is(:hover,:focus-visible) {
+  background: #fff7d8;
+  border-color: #9a793e;
+}
+.plaque-person { display: grid; justify-items: center; position: relative; }
+.plaque-person .agent-avatar { border-color: #7d948d; }
+.plaque-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid #99b8ae;
+  border-radius: 6px;
+  background: #e5f5ec;
+  color: #285e50;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1.35;
+  padding-inline: 4px;
+  white-space: nowrap;
+}
+.plaque-person .plaque-badge { position: relative; margin-top: -2px; }
+.plaque-badge.is-chair { background: #ffeab1; color: #70501a; border-color: #d3af62; }
+.plaque-more { font-size: 12px; font-variant-numeric: tabular-nums; }
+.plaque-roster { display: grid; gap: 0; list-style: none; margin: 0; padding: 0; }
+.plaque-roster li { display: flex; align-items: center; gap: 12px; padding: 9px 0; }
+.plaque-roster li + li { border-top: 1px solid var(--line); }
+.plaque-roster li > div { min-width: 0; overflow-wrap: anywhere; }
+.plaque-roster strong { margin-right: 7px; }
+.plaque-roster p { margin: 3px 0; }
+.plaque-roster small { display: block; color: var(--muted); }
+@container (max-width: 760px) {
+  .plaque-person .agent-avatar { width: 27px; height: 27px; }
+  .venue-plaque .plaque-participants { gap: 3px; padding-inline: 4px; }
+  .plaque-laurel { width: 47px; }
+}
+@container (max-width: 600px) {
+  .venue-stage.venue-map { height: 438px; }
+  .venue-plaque { width: min(74%,260px); top: 49%; padding: 10px 8px 6px; gap: 3px; }
+  .venue-plaque h3 { font-size: 14px; line-height: 1.2; }
+  .plaque-person .agent-avatar { width: 24px; height: 24px; }
+  .venue-plaque .plaque-participants { padding-block: 2px; gap: 5px; }
+}

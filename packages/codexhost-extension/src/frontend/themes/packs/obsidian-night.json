@@ -1,0 +1,22 @@
+{
+  "id": "obsidian-night",
+  "name": "Obsidian Night",
+  "scheme": "dark",
+  "tokens": {
+    "canvas": "#101e36",
+    "card": "#172a46",
+    "ink": "#ecf4ff",
+    "muted": "#b7c7df",
+    "line": "#3b506d",
+    "primary": "#80eafa",
+    "wash": "#213953",
+    "live": "#ffd47c",
+    "live-fill": "#f9c65d",
+    "done": "#92e8cb",
+    "done-fill": "#73d9bc",
+    "soft": "#20334e",
+    "shadow": "#030c2455",
+    "edge": "#6782a3",
+    "action": "#215bd7"
+  }
+}

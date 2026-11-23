@@ -1,0 +1,159 @@
+{
+  "manifestVersion": 2,
+  "id": "the-althing",
+  "version": "1.0.1",
+  "name": {
+    "en": "The Althing",
+    "zh-CN": "议事厅"
+  },
+  "description": {
+    "en": "Convene expert councils in CodexHost projects and publish their findings.",
+    "zh-CN": "在 CodexHost 项目中召集专家议会并发布研究结论。"
+  },
+  "details": {
+    "en": "### Inside the council\n\n- Convene a panel from the harnesses and models available on your Host. Give each expert a role and choose a moderator.\n- Follow opening statements, peer critiques and rebuttals around the illustrated round table or in a reading view. Open a delegated thread to inspect its work.\n- Publish agenda conclusions and final reports. Download a standalone publication or transfer the complete council as a portable ZIP.",
+    "zh-CN": "### 在议事厅中\n\n- 从本机可用的智能体和模型中选出专家与主持人，为每位专家指定研究角色。\n- 在圆桌会场或阅读模式中跟进独立分析、交叉质询与反驳，打开子会话查看实时进展。\n- 发布议程结论和总报告，下载独立出版物，或通过 ZIP 在不同主机之间迁移完整议题。"
+  },
+  "author": "mythezone",
+  "categories": ["workflow", "tools"],
+  "settingsSchema": [
+    {
+      "key": "dataDir",
+      "type": "string",
+      "label": {
+        "en": "Local data directory (empty for Host default)",
+        "zh-CN": "本地数据目录（留空使用宿主默认位置）"
+      },
+      "default": ""
+    },
+    {
+      "key": "showProjectAlthingItems",
+      "type": "boolean",
+      "label": {
+        "en": "Show project councils in sidebar",
+        "zh-CN": "在侧栏项目下显示议会"
+      },
+      "default": true
+    },
+    {
+      "key": "defaultProtocol",
+      "type": "select",
+      "label": {
+        "en": "Default protocol",
+        "zh-CN": "默认议事协议"
+      },
+      "default": "council-standard",
+      "options": [
+        {
+          "value": "council-standard",
+          "label": {
+            "en": "Standard Council",
+            "zh-CN": "标准议会"
+          }
+        },
+        {
+          "value": "adversarial-debate",
+          "label": {
+            "en": "Adversarial Debate",
+            "zh-CN": "对抗辩论"
+          }
+        },
+        {
+          "value": "rapid-panel",
+          "label": {
+            "en": "Rapid Panel",
+            "zh-CN": "快速评议"
+          }
+        }
+      ]
+    },
+    {
+      "key": "defaultTheme",
+      "type": "select",
+      "label": {
+        "en": "Default theme",
+        "zh-CN": "默认主题"
+      },
+      "default": "auto",
+      "options": [
+        {
+          "value": "auto",
+          "label": {
+            "en": "Automatic",
+            "zh-CN": "自动"
+          }
+        },
+        {
+          "value": "editorial-paper",
+          "label": {
+            "en": "Editorial Paper",
+            "zh-CN": "编辑纸页"
+          }
+        },
+        {
+          "value": "cool-slate",
+          "label": {
+            "en": "Cool Slate",
+            "zh-CN": "冷灰石板"
+          }
+        },
+        {
+          "value": "obsidian-night",
+          "label": {
+            "en": "Obsidian Night",
+            "zh-CN": "黑曜之夜"
+          }
+        }
+      ]
+    },
+    {
+      "key": "externalEndpoint",
+      "type": "string",
+      "label": {
+        "en": "Local API endpoint (empty to discover)",
+        "zh-CN": "本机 API 地址（留空自动发现）"
+      },
+      "default": ""
+    },
+    {
+      "key": "clientToken",
+      "type": "string",
+      "label": {
+        "en": "Client token (empty for local CLI credentials)",
+        "zh-CN": "客户端令牌（留空读取本地 CLI 凭据）"
+      },
+      "default": ""
+    }
+  ],
+  "page": {
+    "apiVersion": 1,
+    "entry": "page/index.mjs",
+    "title": {
+      "en": "The Althing",
+      "zh-CN": "议事厅"
+    },
+    "style": "page/style.css"
+  },
+  "web": {
+    "apiVersion": 1,
+    "entry": "web/index.mjs",
+    "style": "web/style.css"
+  },
+  "desktop": {
+    "apiVersion": 1,
+    "script": "desktop/index.js",
+    "style": "desktop/style.css"
+  },
+  "backend": {
+    "apiVersion": 1,
+    "entry": "backend/index.mjs"
+  },
+  "repository": "https://github.com/mythezone/codexhost-ext-the-althing",
+  "icon": "assets/icon.png",
+  "screenshots": [
+    "assets/screenshots/hub.webp",
+    "assets/screenshots/venue-lobby.webp",
+    "assets/screenshots/venue-roundtable.webp",
+    "assets/screenshots/report-reader.webp"
+  ]
+}

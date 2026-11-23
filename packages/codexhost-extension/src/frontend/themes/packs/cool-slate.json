@@ -1,0 +1,22 @@
+{
+  "id": "cool-slate",
+  "name": "Cool Slate",
+  "scheme": "light",
+  "tokens": {
+    "canvas": "#edf4fa",
+    "card": "#fafdff",
+    "ink": "#17384d",
+    "muted": "#456776",
+    "line": "#b8cedd",
+    "primary": "#066682",
+    "wash": "#d9f2f5",
+    "live": "#784100",
+    "live-fill": "#ffcf76",
+    "done": "#106456",
+    "done-fill": "#84dcca",
+    "soft": "#e5eff5",
+    "shadow": "#7798a830",
+    "edge": "#87a7b4",
+    "action": "#086582"
+  }
+}

@@ -1,0 +1,1069 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Topic",
+  "$defs": {
+    "Agenda": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,95}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "code": {
+          "default": "",
+          "title": "Code",
+          "type": "string"
+        },
+        "order_index": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Order Index"
+        },
+        "objective": {
+          "default": "",
+          "title": "Objective",
+          "type": "string"
+        },
+        "status": {
+          "default": "pending",
+          "enum": [
+            "pending",
+            "in_progress",
+            "critiquing",
+            "completed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "progress_pct": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "current_activity": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Activity"
+        },
+        "conclusion_summary": {
+          "default": "",
+          "title": "Conclusion Summary",
+          "type": "string"
+        },
+        "conclusion_key_points": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Conclusion Key Points",
+          "type": "array"
+        },
+        "open_disagreements": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Open Disagreements",
+          "type": "array"
+        },
+        "report_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,95}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Report Id"
+        },
+        "sub_agendas": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SubAgenda"
+          },
+          "title": "Sub Agendas",
+          "type": "array"
+        },
+        "completed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completed At"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "topic_id": {
+          "type": "string"
+        },
+        "pinned_fields": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "progress_pct",
+              "current_activity",
+              "status"
+            ]
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "code",
+        "order_index",
+        "objective",
+        "status",
+        "progress_pct",
+        "current_activity",
+        "conclusion_summary",
+        "conclusion_key_points",
+        "open_disagreements",
+        "report_id",
+        "sub_agendas",
+        "completed_at",
+        "created_at",
+        "updated_at",
+        "topic_id"
+      ],
+      "title": "Agenda",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "Moderator": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "default": "",
+          "title": "Name",
+          "type": "string"
+        },
+        "model": {
+          "default": "",
+          "title": "Model",
+          "type": "string"
+        },
+        "provider": {
+          "default": "",
+          "title": "Provider",
+          "type": "string"
+        }
+      },
+      "title": "Moderator",
+      "type": "object"
+    },
+    "Panelist": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "model": {
+          "default": "",
+          "title": "Model",
+          "type": "string"
+        },
+        "provider": {
+          "default": "",
+          "title": "Provider",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,95}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "subscription": {
+          "default": "",
+          "title": "Subscription",
+          "type": "string"
+        },
+        "reasoning_effort": {
+          "default": "",
+          "title": "Reasoning Effort",
+          "type": "string"
+        },
+        "role": {
+          "default": "",
+          "title": "Role",
+          "type": "string"
+        },
+        "color_token": {
+          "default": "",
+          "title": "Color Token",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "id"
+      ],
+      "title": "Panelist",
+      "type": "object"
+    },
+    "SubAgenda": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,95}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "code": {
+          "default": "",
+          "title": "Code",
+          "type": "string"
+        },
+        "order_index": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Order Index"
+        },
+        "prompt_framing": {
+          "default": "",
+          "title": "Prompt Framing",
+          "type": "string"
+        },
+        "execution_mode": {
+          "default": "parallel",
+          "enum": [
+            "parallel",
+            "sequential"
+          ],
+          "title": "Execution Mode",
+          "type": "string"
+        },
+        "depends_on": {
+          "default": [],
+          "items": {
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,95}$",
+            "type": "string"
+          },
+          "title": "Depends On",
+          "type": "array"
+        },
+        "status": {
+          "default": "pending",
+          "enum": [
+            "pending",
+            "dispatching",
+            "in_progress",
+            "critiquing",
+            "completed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "progress_pct": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "current_activity": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Activity"
+        },
+        "synthesis_summary": {
+          "default": "",
+          "title": "Synthesis Summary",
+          "type": "string"
+        },
+        "completed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completed At"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "topic_id": {
+          "type": "string"
+        },
+        "agenda_id": {
+          "type": "string"
+        },
+        "dispatches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Dispatch"
+          }
+        },
+        "contributions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Contribution"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "code",
+        "order_index",
+        "prompt_framing",
+        "execution_mode",
+        "depends_on",
+        "status",
+        "progress_pct",
+        "current_activity",
+        "synthesis_summary",
+        "completed_at",
+        "created_at",
+        "updated_at",
+        "topic_id",
+        "agenda_id",
+        "dispatches",
+        "contributions"
+      ],
+      "title": "SubAgenda",
+      "type": "object"
+    },
+    "Dispatch": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,95}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "round_number": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Round Number",
+          "type": "integer"
+        },
+        "round_type": {
+          "default": "opening",
+          "enum": [
+            "opening",
+            "critique",
+            "rebuttal",
+            "synthesis_request",
+            "custom"
+          ],
+          "title": "Round Type",
+          "type": "string"
+        },
+        "moderator_name": {
+          "default": "",
+          "title": "Moderator Name",
+          "type": "string"
+        },
+        "prompt_summary": {
+          "title": "Prompt Summary",
+          "type": "string"
+        },
+        "prompt_full": {
+          "title": "Prompt Full",
+          "type": "string"
+        },
+        "target_panelist_ids": {
+          "default": [],
+          "items": {
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,95}$",
+            "type": "string"
+          },
+          "title": "Target Panelist Ids",
+          "type": "array"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "topic_id": {
+          "type": "string"
+        },
+        "agenda_id": {
+          "type": "string"
+        },
+        "sub_agenda_id": {
+          "type": "string"
+        },
+        "contributions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Contribution"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "round_number",
+        "round_type",
+        "moderator_name",
+        "prompt_summary",
+        "prompt_full",
+        "target_panelist_ids",
+        "created_at",
+        "updated_at",
+        "topic_id",
+        "agenda_id",
+        "sub_agenda_id",
+        "contributions"
+      ],
+      "title": "Dispatch",
+      "type": "object"
+    },
+    "Contribution": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,95}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "dispatch_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,95}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dispatch Id"
+        },
+        "panelist_id": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,95}$",
+          "title": "Panelist Id",
+          "type": "string"
+        },
+        "panelist_name": {
+          "default": "",
+          "title": "Panelist Name",
+          "type": "string"
+        },
+        "model": {
+          "default": "",
+          "title": "Model",
+          "type": "string"
+        },
+        "provider": {
+          "default": "",
+          "title": "Provider",
+          "type": "string"
+        },
+        "subscription": {
+          "default": "",
+          "title": "Subscription",
+          "type": "string"
+        },
+        "reasoning_effort": {
+          "default": "",
+          "title": "Reasoning Effort",
+          "type": "string"
+        },
+        "role": {
+          "default": "",
+          "title": "Role",
+          "type": "string"
+        },
+        "round_number": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Round Number",
+          "type": "integer"
+        },
+        "kind": {
+          "default": "analysis",
+          "enum": [
+            "analysis",
+            "critique",
+            "rebuttal",
+            "verification",
+            "supplement"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "summary": {
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        },
+        "key_points": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Key Points",
+          "type": "array"
+        },
+        "stance_tags": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Stance Tags",
+          "type": "array"
+        },
+        "full_content": {
+          "minLength": 1,
+          "title": "Full Content",
+          "type": "string"
+        },
+        "target_contribution_ids": {
+          "default": [],
+          "items": {
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,95}$",
+            "type": "string"
+          },
+          "title": "Target Contribution Ids",
+          "type": "array"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Ms"
+        },
+        "token_usage": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/JsonValue"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Token Usage"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "topic_id": {
+          "type": "string"
+        },
+        "agenda_id": {
+          "type": "string"
+        },
+        "sub_agenda_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "dispatch_id",
+        "panelist_id",
+        "panelist_name",
+        "model",
+        "provider",
+        "subscription",
+        "reasoning_effort",
+        "role",
+        "round_number",
+        "kind",
+        "summary",
+        "key_points",
+        "stance_tags",
+        "full_content",
+        "target_contribution_ids",
+        "duration_ms",
+        "token_usage",
+        "created_at",
+        "updated_at",
+        "topic_id",
+        "agenda_id",
+        "sub_agenda_id"
+      ],
+      "title": "Contribution",
+      "type": "object"
+    },
+    "Report": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,95}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "subtitle": {
+          "default": "",
+          "title": "Subtitle",
+          "type": "string"
+        },
+        "agenda_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,95}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agenda Id"
+        },
+        "report_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "agenda",
+                "final",
+                "custom"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Report Type"
+        },
+        "version": {
+          "default": "1",
+          "title": "Version",
+          "type": "string"
+        },
+        "format": {
+          "anyOf": [
+            {
+              "enum": [
+                "html",
+                "markdown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Format"
+        },
+        "markdown_content": {
+          "default": "",
+          "title": "Markdown Content",
+          "type": "string"
+        },
+        "html_content": {
+          "default": "",
+          "title": "Html Content",
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "topic_id": {
+          "type": "string"
+        },
+        "source_html": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "topic_id",
+        "report_type",
+        "format",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "Report",
+      "type": "object"
+    },
+    "Archive": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "topic_id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "format": {
+          "const": "zip"
+        },
+        "file_name": {
+          "type": "string"
+        },
+        "file_size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "metadata": {
+          "type": "object"
+        },
+        "download_url": {
+          "type": "string"
+        },
+        "preview_url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "topic_id",
+        "title",
+        "format",
+        "file_name",
+        "file_size_bytes",
+        "sha256",
+        "created_at",
+        "metadata",
+        "download_url",
+        "preview_url"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,95}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "title": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "subtitle": {
+      "default": "",
+      "title": "Subtitle",
+      "type": "string"
+    },
+    "description": {
+      "default": "",
+      "title": "Description",
+      "type": "string"
+    },
+    "domain_tags": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Domain Tags",
+      "type": "array"
+    },
+    "protocol_id": {
+      "default": "council-standard",
+      "title": "Protocol Id",
+      "type": "string"
+    },
+    "status": {
+      "default": "draft",
+      "enum": [
+        "draft",
+        "in_progress",
+        "synthesizing",
+        "completed",
+        "archived"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "progress_pct": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "current_activity": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Current Activity"
+    },
+    "moderator": {
+      "$ref": "#/$defs/Moderator",
+      "default": {
+        "name": "",
+        "model": "",
+        "provider": ""
+      }
+    },
+    "panelists": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Panelist"
+      },
+      "title": "Panelists",
+      "type": "array"
+    },
+    "executive_summary": {
+      "default": "",
+      "title": "Executive Summary",
+      "type": "string"
+    },
+    "key_takeaways": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Key Takeaways",
+      "type": "array"
+    },
+    "final_report_id": {
+      "anyOf": [
+        {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,95}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Final Report Id"
+    },
+    "metadata": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "default": {},
+      "title": "Metadata",
+      "type": "object"
+    },
+    "agendas": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Agenda"
+      },
+      "title": "Agendas",
+      "type": "array"
+    },
+    "completed_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Completed At"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "reports": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Report"
+      }
+    },
+    "archives": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Archive"
+      }
+    },
+    "active_agendas": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "agenda_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "completed_agendas": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "sub_agenda_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "completed_sub_agendas": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "contribution_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "report_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "archive_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "pinned_fields": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "progress_pct",
+          "current_activity",
+          "status"
+        ]
+      }
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "subtitle",
+    "description",
+    "domain_tags",
+    "protocol_id",
+    "status",
+    "progress_pct",
+    "current_activity",
+    "moderator",
+    "panelists",
+    "executive_summary",
+    "key_takeaways",
+    "final_report_id",
+    "metadata",
+    "agendas",
+    "completed_at",
+    "created_at",
+    "updated_at",
+    "reports",
+    "archives",
+    "active_agendas",
+    "agenda_count",
+    "completed_agendas",
+    "sub_agenda_count",
+    "completed_sub_agendas",
+    "contribution_count",
+    "report_count",
+    "archive_count"
+  ],
+  "type": "object"
+}
