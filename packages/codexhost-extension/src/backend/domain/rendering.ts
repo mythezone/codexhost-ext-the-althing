@@ -22,12 +22,25 @@ const markdown = new Marked({
   async: false,
   gfm: true,
   renderer: {
-    html: ({ text }) => escape(text),
+    html: ({ text }) => {
+      const tag = text.trim();
+      const empty = /^<(br|hr|wbr)\s*\/?>$/i.exec(tag);
+      if (empty) return text.replace(tag, "<" + empty[1].toLowerCase() + ">");
+      const inline = /^<(\/?)(sub|sup|b|i|strong|em|del|s|u|mark)\s*>$/i.exec(
+        tag,
+      );
+      if (inline)
+        return text.replace(
+          tag,
+          "<" + inline[1] + inline[2].toLowerCase() + ">",
+        );
+      return escape(text);
+    },
     image: ({ text }) => escape(text),
   },
 });
 const allowed = new Set(
-  "a p hr br strong b em i del s blockquote pre code ul ol li h1 h2 h3 h4 h5 h6 table thead tbody tr th td".split(
+  "a p hr br wbr sup sub u mark strong b em i del s blockquote pre code ul ol li h1 h2 h3 h4 h5 h6 table thead tbody tr th td".split(
     " ",
   ),
 );
@@ -113,7 +126,7 @@ function md(source: string, headings?: string[]) {
       tag +
       attrs +
       ">" +
-      (["br", "hr"].includes(tag) ? "" : inner + "</" + tag + ">")
+      (["br", "hr", "wbr"].includes(tag) ? "" : inner + "</" + tag + ">")
     );
   }
   return parseFragment(markdown.parse(source, { async: false }))

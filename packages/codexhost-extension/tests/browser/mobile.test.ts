@@ -8,7 +8,8 @@ import {
   type CDPSession,
 } from "playwright-core";
 import { readFile } from "node:fs/promises";
-import { councilFixture } from "../helpers";
+import { measureBounds } from "./bounds";
+import { councilFixture, contribution, dispatch } from "../helpers";
 import { hydrate } from "../../src/backend/domain/council";
 import { mockUI } from "../ui-host";
 
@@ -404,6 +405,231 @@ for (const engine of [chromium, webkit]) {
             ),
         );
         assert.deepEqual(errors, []);
+      },
+    );
+  }
+}
+
+const longTitle =
+  "社区观察 · " +
+  "QuarterlyReview".repeat(8) +
+  "与下一阶段公共服务的跨区域评估";
+
+for (const engine of [chromium, webkit]) {
+  for (const width of [320, 375, 480]) {
+    test(
+      engine.name() +
+        " " +
+        width +
+        "px keeps long content and menus inside their frames",
+      async (t) => {
+        const browser = await engine.launch();
+        t.after(() => browser.close());
+        const page = await browser.newPage({
+          viewport: { width, height: 812 },
+          isMobile: true,
+          hasTouch: true,
+        });
+        page.setDefaultTimeout(6000);
+        const c = councilFixture();
+        c.create("dispatch", { ...dispatch, title: longTitle }, "s");
+        c.create(
+          "contribution",
+          {
+            ...contribution,
+            summary: longTitle,
+            full_content:
+              "排版<br />换行<sup>2</sup><sub>3</sub><wbr><u>线</u><mark>记</mark><b>粗</b><i>斜</i><s>删</s>\n\n" +
+              wideMarkdown +
+              "\n\n```\n" +
+              "example".repeat(180) +
+              "\n```",
+          },
+          "s",
+        );
+        const shortTables =
+          "| 地点 | 时间 |\n| --- | --- |\n| 书屋 | 周六 |\n\n| 地点 | 时间 | 活动 |\n| --- | --- | --- |\n| 公园 | 周日 | 阅读 |";
+        const reports = [1, 2].map((i) =>
+          c.create(
+            "report",
+            { title: longTitle + i, markdown_content: shortTables },
+            "study",
+          ),
+        );
+        // A stored 1.0.2 report already has scroll regions, but its short tables did not fill them.
+        reports[1].html_content = reports[1].html_content!.replace(
+          "min-width: 100%; border-collapse",
+          "border-collapse",
+        );
+        const topic = hydrate(c.tree);
+        topic.title =
+          topic.agendas[0].title =
+          topic.agendas[0].sub_agendas[0].title =
+            longTitle;
+        topic.panelists[0].name = longTitle;
+        topic.archives = [1, 2].map((i) => ({
+          id: "archive" + i,
+          title: longTitle + i,
+          topic_id: topic.id,
+          format: "zip",
+          file_name: "archive.zip",
+          file_size_bytes: 10,
+          sha256: "a".repeat(64),
+          created_at: new Date(0).toISOString(),
+          metadata: {},
+          download_url: "",
+          preview_url: "",
+        }));
+        const { api } = mockUI();
+        await page.exposeFunction(
+          "invoke",
+          async (
+            method: string,
+            params: { topicId?: string; reportId?: string },
+          ) => {
+            if (method.endsWith("/topics/get"))
+              return {
+                ...topic,
+                id: params.topicId,
+                status:
+                  params.topicId === "other" ? "completed" : "in_progress",
+              };
+            if (method.endsWith("/reports/get"))
+              return reports.find((r) => r.id === params.reportId);
+            const result = await api.backend.invoke(method, params);
+            if (method.endsWith("/topics/list") && Array.isArray(result))
+              return result.map((r) => ({ ...r, title: longTitle }));
+            if (method.endsWith("/council/runs") && Array.isArray(result))
+              return result.map((r) => ({
+                ...r,
+                model: longTitle,
+                progressText: "https://example.test/" + "reading".repeat(45),
+              }));
+            return result;
+          },
+        );
+        await openWebPanel(page);
+        const root = page.locator(".althing-ext-root"),
+          dialog = root.getByRole("dialog");
+        const check = async (stage: string) => {
+          const { boxes, problems } = await root.evaluate(measureBounds, width);
+          assert.ok(boxes > 0, stage);
+          assert.deepEqual(
+            problems,
+            [],
+            stage + ": " + JSON.stringify(problems),
+          );
+        };
+        async function menuFits(selector: string, anchor: string) {
+          const menu = root.locator(selector);
+          await menu.waitFor();
+          const m = (await menu.boundingBox())!,
+            a = (await root.locator(anchor).boundingBox())!;
+          assert.ok(
+            Math.abs(a.x - m.x) <= 1 && Math.abs(a.width - m.width) <= 1,
+            selector,
+          );
+          await check(selector);
+        }
+        const enter = root.getByRole("button", { name: "Enter council" });
+        await enter.last().waitFor();
+        await check("hub");
+        await root.getByRole("button", { name: "New Council" }).tap();
+        await dialog.locator("input[required]").fill(longTitle);
+        await check("wizard details");
+        await dialog.getByRole("button", { name: "Continue" }).tap();
+        await dialog.getByRole("button", { name: /Add expert/ }).tap();
+        await check("wizard roster");
+        await dialog
+          .getByRole("button", { name: /Remove expert/ })
+          .last()
+          .tap();
+        await dialog.getByRole("button", { name: "Continue" }).tap();
+        await dialog.getByRole("button", { name: /Add agenda/ }).tap();
+        await dialog
+          .getByRole("button", { name: /Add sub-agenda/ })
+          .last()
+          .tap();
+        await check("wizard agenda");
+        const close = dialog.getByRole("button", {
+          name: "Close",
+          exact: true,
+        });
+        await close.tap();
+        await enter.first().tap();
+        await root.locator(".agenda-line").waitFor();
+        await root.locator(".run-card").waitFor();
+        await check("active overview, archive and report buttons");
+        await root.locator(".action-menu summary").tap();
+        await menuFits(".action-menu > .tools", ".council-breadcrumb");
+        await root.locator(".action-menu summary").tap();
+        await root.getByLabel("Choose agenda").tap();
+        await menuFits(".council-agenda-list", ".council-navigation");
+        await root.locator(".council-agenda-list button").first().tap();
+        await root.locator(".response .fold > button").tap();
+        await root.locator(".response pre").waitFor();
+        for (const tag of [
+          "br",
+          "sup",
+          "sub",
+          "wbr",
+          "u",
+          "mark",
+          "b",
+          "i",
+          "s",
+        ])
+          assert.equal(
+            await root.locator(".response .reveal " + tag).count(),
+            1,
+            tag,
+          );
+        await root.locator(".response .table-scroll").waitFor();
+        await check("sub-agenda and expanded full text");
+        await root.getByRole("button", { name: "Dispatch round" }).tap();
+        await dialog.locator("select").first().selectOption("critique");
+        await dialog.getByText(longTitle, { exact: false }).last().waitFor();
+        await check("dispatch with long critique target");
+        await close.tap();
+        await root.getByRole("button", { name: "Update sub-agenda" }).tap();
+        await dialog.waitFor();
+        await check("quick edit");
+        await close.tap();
+        await root.getByRole("button", { name: "Councils", exact: true }).tap();
+        await enter.last().tap();
+        await root.locator(".report-index").waitFor();
+        await check("completed overview and report index");
+        if (width === 375) {
+          await page.setViewportSize({ width: 1280, height: 900 });
+          for (const [index, report] of reports.entries()) {
+            await root.locator(".report-index button").nth(index).click();
+            const regions = dialog
+              .locator("iframe")
+              .contentFrame()
+              .locator(".table-scroll");
+            await regions.first().waitFor();
+            const sizes = await regions.evaluateAll((es) =>
+              es.map((el) => [
+                el.clientWidth,
+                el.querySelector("table")!.getBoundingClientRect().width,
+              ]),
+            );
+            assert.equal(sizes.length, 2, report.id);
+            assert.ok(
+              sizes.every(
+                ([box, table]) => box >= 600 && Math.abs(box - table) <= 1,
+              ),
+              JSON.stringify(sizes),
+            );
+            console.log(
+              engine.name(),
+              "desktop short tables, report",
+              index + 1,
+              sizes,
+            );
+            await close.click();
+          }
+        }
       },
     );
   }

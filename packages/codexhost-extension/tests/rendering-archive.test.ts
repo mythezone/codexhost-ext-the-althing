@@ -323,3 +323,74 @@ test("legacy layout upgrade preserves scripts, author srcdoc, CSP and existing r
   assert.equal(tree.reports[0].id, r.id);
   assert.equal(tree.reports[0].html_content, source);
 });
+
+test("Markdown report renders attribute-free layout tags and preserves other raw HTML as text", () => {
+  const source = [
+    "列前<br>列后<BR/>换行<br />末行<wBr/>断点",
+    "| 项目 | 注释 |\n| --- | --- |\n| H<sub>2</sub>O | x<SUP>2</SUP><br />换行 |",
+    "正文<b>粗</b><i>斜</i><strong>重</strong><em>音</em><del>删</del><s>旧</s><u>线</u><mark>记</mark>",
+    "<hr />",
+    "`<br>`",
+    "正文<br onclick=alert(1)>属性",
+    "<script>alert(1)</script>",
+    "正文<img onerror=alert(1)>与<tool_call>文本",
+  ].join("\n\n");
+  const report = councilFixture().create(
+    "report",
+    { title: "排版", markdown_content: source },
+    "study",
+  );
+  const body = report
+    .html_content!.split('<article class="body">')[1]
+    .split("</article>")[0];
+  for (const fragment of [
+    "列前<br>列后<br>换行<br>末行<wbr>断点",
+    "<td>H<sub>2</sub>O</td>",
+    "<td>x<sup>2</sup><br>换行</td>",
+    "<b>粗</b><i>斜</i><strong>重</strong><em>音</em><del>删</del><s>旧</s><u>线</u><mark>记</mark>",
+    "<hr>",
+    "<code>&lt;br&gt;</code>",
+    "&lt;br onclick=alert(1)&gt;",
+    "&lt;script&gt;alert(1)&lt;/script&gt;",
+    "&lt;img onerror=alert(1)&gt;",
+    "&lt;tool_call&gt;",
+  ])
+    assert.ok(body.includes(fragment), fragment);
+  assert.doesNotMatch(body, /<(?:script|img|tool_call)\b|<br\s+onclick/i);
+});
+
+test("legacy layout entities upgrade only in ordinary text and keep original protected bytes", async () => {
+  const { reportDocument } = await import("../src/shared/report-document");
+  const script = 'const literal = "&lt;br&gt;";\r\n';
+  const hash = createHash("sha256").update(script).digest("base64");
+  const csp =
+    '<meta http-equiv="Content-Security-Policy" content="script-src ' +
+    `'sha256-${hash}'"/>`;
+  const title = "<title>示例 &lt;br&gt;</title>";
+  const protectedBody = [
+    "<code>&lt;br&gt;</code>",
+    "<pre><span>&lt;br/&gt;</span></pre>",
+    "<textarea>&lt;br&gt;</textarea>",
+    "<style>/* &lt;br&gt; */</style>",
+    "<script>" + script + "</script>",
+    '<iframe srcdoc="&lt;p&gt;A&amp;lt;br&amp;gt;B&lt;/p&gt;"></iframe>',
+    '<span title="&lt;br&gt;">&lt;br onclick=alert(1)&gt;</span>',
+    "<!-- &lt;br&gt; -->",
+    "&amp;lt;br&amp;gt;",
+  ];
+  const source =
+    "<html><head>" +
+    csp +
+    title +
+    "</head><body>" +
+    "<table><tr><td>甲&lt;Br /&gt;乙&lt;WBR/&gt;丙</td></tr></table>" +
+    "<p>x&lt;sup&gt;2&lt;/sup&gt; H&lt;SUB&gt;2&lt;/SUB&gt;O&lt;hr /&gt;</p>" +
+    protectedBody.join("") +
+    "</body></html>";
+  const upgraded = reportDocument(source, false);
+  assert.ok(upgraded.includes("<td>甲<br>乙<wbr>丙</td>"));
+  assert.ok(upgraded.includes("x<sup>2</sup> H<sub>2</sub>O<hr>"));
+  for (const bytes of [csp, title, ...protectedBody])
+    assert.ok(upgraded.includes(bytes), bytes);
+  assert.equal(reportDocument(upgraded, false), upgraded);
+});

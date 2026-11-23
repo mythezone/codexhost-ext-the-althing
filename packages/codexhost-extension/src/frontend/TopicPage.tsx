@@ -153,7 +153,7 @@ export function TopicPage({
           <h2>{a.title}</h2>
           <Markdown text={a.objective} />
           <Meter value={a.progress_pct} />
-          <div className="tools">
+          <div className="tools resource-actions">
             {a.sub_agendas.map((sub) => (
               <button
                 aria-pressed={s?.id === sub.id}
@@ -235,11 +235,13 @@ export function TopicPage({
       {(reports.length > 0 || tab === "final") && (
         <section className="panel">
           <h2>{l("Reports", "报告")}</h2>
-          {reports.map((r) => (
-            <button key={r.id} onClick={() => setReport(r.id)}>
-              {r.title} · v{r.version}
-            </button>
-          ))}
+          <div className="tools resource-actions">
+            {reports.map((r) => (
+              <button key={r.id} onClick={() => setReport(r.id)}>
+                {r.title} · v{r.version}
+              </button>
+            ))}
+          </div>
           {!reports.length && (
             <p>{l("No report published yet.", "尚无已发布的报告。")}</p>
           )}
@@ -248,18 +250,20 @@ export function TopicPage({
       {tab === "overview" && t.archives.length > 0 && (
         <section className="panel">
           <h2>{l("Archives", "归档")}</h2>
-          {t.archives.map((a) => (
-            <button
-              key={a.id}
-              onClick={() =>
-                void perform(() =>
-                  rpc.download({ topicId: t.id, archiveId: a.id }),
-                )
-              }
-            >
-              {a.title} · {a.created_at.slice(0, 10)}
-            </button>
-          ))}
+          <div className="tools resource-actions">
+            {t.archives.map((a) => (
+              <button
+                key={a.id}
+                onClick={() =>
+                  void perform(() =>
+                    rpc.download({ topicId: t.id, archiveId: a.id }),
+                  )
+                }
+              >
+                {a.title} · {a.created_at.slice(0, 10)}
+              </button>
+            ))}
+          </div>
         </section>
       )}
       {dialog === "dispatch" && s ? (

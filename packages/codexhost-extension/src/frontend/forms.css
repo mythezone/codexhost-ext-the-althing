@@ -10,12 +10,13 @@
 .form-grid .full {grid-column:1/-1}
 .council-wizard {container-type:inline-size}
 .form-grid.council-details {grid-template-columns:repeat(2,minmax(0,1fr))}
-@container (max-width:520px) { .form-grid.council-details {grid-template-columns:1fr} }
-form label:not(.check) {display:grid;gap:4px;font-weight:670;margin-block:6px}
+@container (max-width:520px) { .form-grid.council-details {grid-template-columns:minmax(0,1fr)} }
+form label:not(.check) {display:grid;grid-template-columns:minmax(0,1fr);gap:4px;font-weight:670;margin-block:6px}
 input:not([type=checkbox]):not([type=file]),textarea,select {max-width:100%;min-width:0}
 form input:not([type=checkbox]),form textarea,form select,.hub-tools select {font:inherit;padding:8px 10px;border:1px solid var(--edge);border-radius:7px;background:var(--card);color:var(--ink)}
 form textarea {resize:vertical;width:100%}
-fieldset {border:1px solid var(--line);border-radius:8px;margin:14px 0;padding:12px;min-width:0}
+.form-grid > *, fieldset, .check, .run-card > * {min-width:0;max-width:100%}
+fieldset {border:1px solid var(--line);border-radius:8px;margin:14px 0;padding:12px}
 legend {font-weight:750;padding-inline:5px}
 .check {display:flex;align-items:center;gap:8px;padding:6px}
 .form-footer {justify-content:flex-end;margin-top:18px}
@@ -24,13 +25,15 @@ legend {font-weight:750;padding-inline:5px}
 .action-menu {position:relative}.action-menu summary {cursor:pointer;font-weight:700}
 .action-menu>.tools {position:absolute;right:0;top:100%;z-index:15;width:min(330px,80vw);box-shadow:0 8px 24px var(--shadow)}
 .topic-body>.panel,.topic-body>.discussion {margin-block:14px}
-.run-card {border-top:1px solid var(--line);display:grid;grid-template-columns:minmax(120px,1fr) auto;gap:4px 14px;padding-block:10px}
+.run-card {border-top:1px solid var(--line);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 14px;padding-block:10px}
 .run-card small {display:block;color:var(--muted)}
 .run-card p {white-space:pre-wrap;overflow-wrap:anywhere}
 .run-card .status.running {background:var(--live-fill);color:var(--blue-ink)}
 .run-card .status.failed,.problem {color:var(--ink);background:var(--peach);padding:6px 12px}
 [aria-pressed=true]:not(.chosen) {border-color:var(--primary)}
 @media (max-width:760px) {
+  .action-menu {position:static}
+  .action-menu>.tools {left:0;right:0;top:calc(100% + 4px);width:auto;max-width:100%;margin:0}
   .controls { grid-template-columns: minmax(0,1fr); }
   .global-inner { flex-wrap: wrap; gap: 4px; }
   .hub-tools { justify-content: flex-start; }

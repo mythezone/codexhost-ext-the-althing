@@ -1,7 +1,7 @@
 .council-head {
   width: min(100%, var(--content-width));
   margin-inline: auto;
-  padding: 14px var(--page-inset) 12px;
+  padding: 14px 0 12px;
   color: var(--ink);
 }
 .council-breadcrumb,
@@ -14,6 +14,7 @@
   align-items: center;
 }
 .council-breadcrumb {
+  position: relative;
   gap: 9px;
   min-height: 30px;
 }
@@ -110,6 +111,7 @@ button.council-activity {
   transform: rotate(180deg);
 }
 .council-navigation {
+  position: relative;
   justify-content: space-between;
   gap: 10px 15px;
   flex-wrap: wrap;
@@ -137,6 +139,7 @@ button.council-activity {
   font-weight: 740;
   cursor: pointer;
   white-space: nowrap;
+  max-width: 100%;
   list-style: none;
 }
 .council-agendas summary::-webkit-details-marker {
@@ -174,7 +177,7 @@ button.council-activity {
   }
 }
 .council-agendas {
-  position: relative;
+  max-width: 100%;
   margin: 0;
 }
 .council-agendas summary small,
@@ -196,8 +199,8 @@ button.council-activity {
 .council-agenda-list {
   position: absolute;
   top: calc(100% + 4px);
-  left: 0;
-  width: min(460px, 80vw);
+  left: min(7em, 12%);
+  width: min(460px, 88%);
   max-height: min(420px, 55svh);
   overflow-y: auto;
   background: var(--card);
@@ -255,6 +258,9 @@ button.council-activity {
   font: inherit;
 }
 @media (max-width: 760px) {
+  .council-agenda-list {
+    left: 0; right: 0; width: auto; max-width: 100%;
+  }
   .council-head {
     padding-block: 9px 6px;
   }
@@ -284,10 +290,6 @@ button.council-activity {
   .council-navigation {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-  }
-  .council-agenda-list {
-    left: max(-62px, -18vw);
-    width: min(86vw, 460px);
   }
   .council-nav {
     justify-content: space-between;

@@ -1,21 +1,56 @@
 import { parse, type DefaultTreeAdapterTypes } from "parse5";
 import { tableCss, readerCss } from "../backend/domain/publication.json";
 
-/** Add layout around original source ranges so CSP-hashed scripts and authored srcdoc stay byte-identical. */
+const literalContexts = new Set([
+  "code",
+  "pre",
+  "script",
+  "style",
+  "textarea",
+  "title",
+  "iframe",
+  "xmp",
+  "noscript",
+  "plaintext",
+]);
+
+/** Edit only the original source ranges so CSP-hashed scripts and authored srcdoc stay byte-identical. */
 export function reportDocument(source: string, dark: boolean): string {
   const doc = parse(source, { sourceCodeLocationInfo: true });
-  const insertions: { offset: number; text: string }[] = [];
+  const edits: { offset: number; end?: number; text: string }[] = [];
   let headEnd = 0;
   let hasStyles = false;
   function visit(parent: DefaultTreeAdapterTypes.ParentNode) {
     for (const node of parent.childNodes) {
+      if (node.nodeName === "#text" && node.sourceCodeLocation) {
+        const loc = node.sourceCodeLocation;
+        const raw = source.slice(loc.startOffset, loc.endOffset);
+        // Malformed tables can produce one text-node range spanning intervening markup.
+        if (/<[a-z/!?]/i.test(raw)) continue;
+        for (const match of raw.matchAll(
+          /&lt;(\/?)(br|wbr|sup|sub|hr)\s*\/?&gt;/gi,
+        )) {
+          const tag = match[2].toLowerCase();
+          const closing = match[1];
+          if (closing && (tag === "br" || tag === "wbr")) continue;
+          const offset = loc.startOffset + match.index;
+          edits.push({
+            offset,
+            end: offset + match[0].length,
+            text: "<" + closing + tag + ">",
+          });
+        }
+      }
       if (!("tagName" in node)) continue;
       const loc = node.sourceCodeLocation;
       if (node.tagName === "head")
         headEnd = loc?.endTag?.startOffset ?? loc?.endOffset ?? 0;
       if (
         node.tagName === "style" &&
-        node.attrs.some((a) => a.name === "data-althing-mobile-tables")
+        node.attrs.some((a) => a.name === "data-althing-mobile-tables") &&
+        node.childNodes.some(
+          (child) => "value" in child && child.value.includes(tableCss),
+        )
       )
         hasStyles = true;
       if (
@@ -24,7 +59,7 @@ export function reportDocument(source: string, dark: boolean): string {
         loc?.startTag &&
         !node.attrs.some((a) => a.name === "data-dark")
       )
-        insertions.push({
+        edits.push({
           offset: loc.startTag.endOffset - 1,
           text: " data-dark",
         });
@@ -37,19 +72,19 @@ export function reportDocument(source: string, dark: boolean): string {
               a.value.split(/\s+/).includes("table-scroll"),
           );
         if (!wrapped) {
-          insertions.push({
+          edits.push({
             offset: loc.startOffset,
             text: '<div class="table-scroll" role="region" tabindex="0">',
           });
-          insertions.push({ offset: loc.endOffset, text: "</div>" });
+          edits.push({ offset: loc.endOffset, text: "</div>" });
         }
       }
-      visit(node);
+      if (!literalContexts.has(node.tagName)) visit(node);
     }
   }
   visit(doc);
   if (!hasStyles)
-    insertions.push({
+    edits.push({
       offset: headEnd,
       text:
         "<style data-althing-mobile-tables>" +
@@ -59,11 +94,11 @@ export function reportDocument(source: string, dark: boolean): string {
     });
   let cursor = 0;
   const output: string[] = [];
-  for (const { offset, text } of insertions.sort(
+  for (const { offset, end, text } of edits.sort(
     (a, b) => a.offset - b.offset,
   )) {
     output.push(source.slice(cursor, offset), text);
-    cursor = offset;
+    cursor = end ?? offset;
   }
   return output.join("") + source.slice(cursor);
 }
