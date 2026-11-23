@@ -1,8 +1,6 @@
 # The Althing · 议事厅
 
-**The Althing（议事厅）**得名于冰岛议会 Alþingi。约公元 930 年，人们便在 Þingvellir 集会议事。[冰岛议会的历史介绍](https://www.althingi.is/pdf/Althingi2011_enska.pdf)
-
-在 CodexHost 里，你可以围绕一个项目问题召集几位模型专家，请它们独立分析、互相质询，再由主持模型把共识、分歧和各自的理由写进同一份报告。
+**The Althing（议事厅）**以古希腊神话中的奥林匹斯诸神议事厅为意象：各有所长的模型化身议事席位，围绕同一议题围坐辩论、彼此质询，由主持模型汇总共识、分歧与依据并沉淀为清晰报告。
 
 ![议事厅封面，取自插件的议题广场](assets/art/council.webp)
 
