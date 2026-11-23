@@ -27,6 +27,21 @@ async function setup(t: TestContext, sequential = false) {
     store,
     o,
     make,
+    async finishRun(id: string, output: string) {
+      const runs = await until(
+        () => o.runs("study"),
+        (rs) => rs.some((r) => r.id === id && r.threadId),
+      );
+      host.finish(runs.find((r) => r.id === id)!.threadId!, output);
+      const terminal = await until(
+        () => o.runs("study"),
+        (rs) =>
+          rs.some(
+            (r) => r.id === id && ["failed", "completed"].includes(r.status),
+          ),
+      );
+      return terminal.find((r) => r.id === id)!;
+    },
     wait: (id: string, status: string) =>
       until(
         () => o.runs("study"),
@@ -390,4 +405,188 @@ test("workspace inventory merges project roots, default and recent local paths b
   } finally {
     b.dispose();
   }
+});
+
+test("agenda conclusions normalize fenced object arrays and publish distinct report sections", async (t) => {
+  const { o, host, store, finishRun } = await setup(t);
+  t.after(() => o.dispose());
+  const run = await o.moderate("agenda_conclusion", "study", {
+    agendaId: "a",
+    publishReport: true,
+  });
+  const payload = {
+    conclusion_summary: "延长开放时间。",
+    conclusion_key_points: [
+      {
+        dispatch_id: "round-1",
+        claim: "晚间需求明确。",
+        evidence: ["观察记录"],
+      },
+      42,
+    ],
+    open_disagreements: [
+      {
+        topic: "周末排班",
+        positions: [
+          { name: "甲", view: "轮值" },
+          { name: "乙", view: "固定班次" },
+        ],
+      },
+    ],
+  };
+  const done = await finishRun(
+    run.id,
+    '说明 {"example":true}\n```json\n' +
+      JSON.stringify(payload) +
+      "\n```\n以上为议程结论。",
+  );
+  assert.equal(done.status, "completed", done.error);
+  const prompt = String(host.routes("delegate/start")[0].body.task);
+  assert.match(prompt, /only one JSON object/);
+  assert.match(prompt, /open_disagreements \(string\[\]\)/);
+  const agenda = (await store.load("study")).agendas[0];
+  assert.equal(agenda.conclusion_summary, payload.conclusion_summary);
+  assert.match(agenda.conclusion_key_points[0], /晚间需求明确。.*观察记录/);
+  assert.equal(agenda.conclusion_key_points[1], "42");
+  assert.match(
+    agenda.open_disagreements[0],
+    /周末排班.*甲.*轮值.*乙.*固定班次/,
+  );
+  const body = (await store.report("study", done.reportId!)).markdown_content!;
+  assert.ok(body.includes("## 结论摘要\n\n" + agenda.conclusion_summary));
+  assert.ok(
+    body.includes(
+      "## 关键结论\n\n- " + agenda.conclusion_key_points.join("\n- "),
+    ),
+  );
+  assert.ok(body.includes("## 未决分歧\n\n- " + agenda.open_disagreements[0]));
+});
+
+test("agenda conclusions tolerate omitted arrays and Markdown-only responses", async (t) => {
+  const { o, store, finishRun } = await setup(t);
+  t.after(() => o.dispose());
+  for (const [reply, summary, points, disagreements] of [
+    [
+      '下面是结果： {"conclusion_summary":"保留时段 {A}。","conclusion_key_points":["记录到访量"]} 完毕。',
+      "保留时段 {A}。",
+      ["记录到访量"],
+      [],
+    ],
+    [
+      '{"conclusion_summary":"继续观察。","open_disagreements":null}',
+      "继续观察。",
+      [],
+      [],
+    ],
+    [
+      "# 本轮结论\n\n延长周末时段。\n\n## 关键结论\n- 统计晚间到访量。\n\n## 未决分歧\n- 是否需要提前开馆？",
+      "延长周末时段。",
+      ["统计晚间到访量。"],
+      ["是否需要提前开馆？"],
+    ],
+  ] as const) {
+    const run = await o.moderate("agenda_conclusion", "study", {
+      agendaId: "a",
+      publishReport: true,
+    });
+    const done = await finishRun(run.id, reply);
+    assert.equal(done.status, "completed", done.error);
+    const a = (await store.load("study")).agendas[0];
+    assert.equal(a.conclusion_summary, summary);
+    assert.deepEqual(a.conclusion_key_points, points);
+    assert.deepEqual(a.open_disagreements, disagreements);
+    assert.equal(a.report_id, done.reportId);
+  }
+});
+
+test("final report selects executive prose and substantive findings after metadata and TOC links", async (t) => {
+  const { o, store, finishRun } = await setup(t);
+  t.after(() => o.dispose());
+  const meta = "2026 年 11 月 23 日 · `rapid-panel` · 主题 ID `study`";
+  const links = "- [A1 主议程结论](#a1-conclusion)\n- [附录](#appendix)";
+  const findings = [
+    "2026 年 11 月 23 日的观察确认了晚间需求。",
+    "延长服务时段，详见[记录](#evidence)。",
+  ];
+  const summary = "调查支持延长周末开放时间。";
+  for (const hasSummary of [true, false]) {
+    const report = [
+      "# 年度报告\n" + meta,
+      links,
+      "---",
+      "[返回目录](#toc)",
+      "| 班次 | 人数 |\n| --- | --- |\n| 晚 | 20 |",
+      ...(hasSummary
+        ? ["## 背景", "开放时间已经调整过一次。", "## 执行摘要"]
+        : []),
+      summary,
+      "## 主要发现",
+      ...findings.map((s) => "- " + s),
+      "***",
+      '```json\n{"summary":"附录中的示例，不是报告摘要。"}\n```',
+    ].join("\n\n");
+    const run = await o.moderate("report", "study", { completeTopic: true });
+    const done = await finishRun(run.id, report);
+    assert.equal(done.status, "completed", done.error);
+    const topic = await store.load("study");
+    assert.equal(topic.executive_summary, summary);
+    assert.deepEqual(topic.key_takeaways, findings);
+    assert.equal(
+      (await store.report("study", done.reportId!)).markdown_content,
+      report,
+    );
+  }
+});
+
+test("structured panelist output retains verbatim response and readable findings and tags", async (t) => {
+  const { o, store, finishRun } = await setup(t);
+  t.after(() => o.dispose());
+  const { runs } = await o.dispatchRound("study", "s", {
+    target_panelist_ids: ["p1"],
+  });
+  const output =
+    "结果如下：\n" +
+    JSON.stringify({
+      summary: "继续评估。",
+      key_points: [{ claim: "样本较小" }, { location: "北区", count: 7 }, 0],
+      stance_tags: [{ title: "条件支持" }, "需复核"],
+    }) +
+    "\n已完成。";
+  const done = await finishRun(runs[0].id, output);
+  assert.equal(done.status, "completed", done.error);
+  const c = (await store.load("study")).agendas[0].sub_agendas[0]
+    .contributions[0];
+  assert.equal(c.full_content, output);
+  assert.equal(c.summary, "继续评估。");
+  assert.equal(c.key_points[0], "样本较小");
+  assert.match(c.key_points[1], /location: 北区.*count: 7/);
+  assert.equal(c.key_points[2], "0");
+  assert.deepEqual(c.stance_tags, ["条件支持", "需复核"]);
+});
+
+test("plan reads a complete JSON object between commentary, respecting quoted braces and escapes", async (t) => {
+  const { o, host, store, finishRun } = await setup(t);
+  t.after(() => o.dispose());
+  const title = '检查 "} {" 标记';
+  const plan = { agendas: [{ title, sub_agendas: [{ title: "第二阶段" }] }] };
+  const run = await o.moderate("plan", "study", {});
+  const done = await finishRun(
+    run.id,
+    "格式 {示例}。\n" + JSON.stringify(plan) + "\n说明 {结束}。",
+  );
+  assert.equal(done.status, "completed", done.error);
+  assert.equal((await store.load("study")).agendas.at(-1)!.title, title);
+  assert.match(
+    String(host.routes("delegate/start")[0].body.task),
+    /only one JSON object/,
+  );
+  const invalid = await o.moderate("plan", "study", {});
+  const before = (await store.load("study")).agendas;
+  const failed = await finishRun(
+    invalid.id,
+    '{"agendas":[{"title":"First"},{"title":0}]}',
+  );
+  assert.equal(failed.status, "failed");
+  assert.match(failed.error!, /agendas\[1\].title/);
+  assert.deepEqual((await store.load("study")).agendas, before);
 });

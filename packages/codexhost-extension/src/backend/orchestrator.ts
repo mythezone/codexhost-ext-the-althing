@@ -1,5 +1,6 @@
 import path from "node:path";
 import { z } from "zod";
+import { Lexer, type Token } from "marked";
 import {
   CodexHostBridge,
   HostError,
@@ -103,53 +104,206 @@ const update = (c: Council, r: Run, fields: Partial<Run>) => {
   Object.assign(r, fields, { updatedAt: now() });
   c.emit("run.updated", r.id);
 };
-function extract(text: string) {
-  if (/^\s*(?:\{|```json)/i.test(text)) {
+function structured(
+  text: string,
+  field: string,
+): Record<string, unknown> | undefined {
+  function candidate(source: string) {
     try {
-      const parsed = z
-        .object({
-          summary: z.string().trim().min(1),
-          key_points: z.array(z.string()).max(5),
-          stance_tags: z.array(z.string()).default([]),
-        })
-        .safeParse(structured(text));
-      if (parsed.success) return parsed.data;
+      const value = JSON.parse(source);
+      if (
+        value &&
+        typeof value === "object" &&
+        !Array.isArray(value) &&
+        Object.hasOwn(value, field)
+      )
+        return value as Record<string, unknown>;
     } catch {
-      /* A Markdown answer may also begin with a code example. */
+      // Explanatory prose and examples can contain braces as well.
     }
   }
-  const lines = text
-    .trim()
-    .split(/\r?\n/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const points = lines
-    .filter((s) => /^(?:[-*+]|\d+[.)])\s+/.test(s))
-    .map((s) => s.replace(/^(?:[-*+]|\d+[.)])\s+/, ""))
-    .slice(0, 5);
-  const lead =
-    lines.find((s) => !/^#{1,6} |^[-*+] |^stance tags:/i.test(s)) ?? lines[0];
-  if (!points.length) {
-    const prose = lines.filter(
-      (line) => line !== lead && !/^#|^stance tags:/i.test(line),
-    );
-    points.push(...prose.slice(0, 5));
+  for (const fence of text.matchAll(
+    /^ {0,3}`{3}json[ \t]*\r?\n([\s\S]*?)^ {0,3}`{3}[ \t]*\r?$/gim,
+  )) {
+    const value = candidate(fence[1]);
+    if (value) return value;
   }
-  const tags =
-    lines
-      .find((s) => /^stance tags:/i.test(s))
-      ?.replace(/^stance tags:/i, "")
-      .split(/[,，]/)
-      .map((s) => s.trim())
-      .filter(Boolean) ?? [];
-  return { summary: lead.slice(0, 800), key_points: points, stance_tags: tags };
+  let depth = 0,
+    start = 0,
+    quoted = false;
+  for (let i = text.indexOf("{"); i >= 0 && i < text.length; i++) {
+    const ch = text[i];
+    if (quoted && ch === "\\") i++;
+    else if (depth && ch === '"') quoted = !quoted;
+    else if (!quoted && ch === "{") {
+      if (!depth) start = i;
+      depth++;
+    } else if (!quoted && depth && ch === "}" && --depth === 0) {
+      const value = candidate(text.slice(start, i + 1));
+      if (value) return value;
+    }
+  }
 }
-function structured(text: string) {
-  return input(
-    JSON.parse(text.trim().replace(/^```(?:json)?\s*|\s*```$/gi, "")),
+
+const contentFields = [
+  "title",
+  "topic",
+  "point",
+  "summary",
+  "claim",
+  "description",
+  "detail",
+  "text",
+  "positions",
+  "evidence",
+];
+function readable(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value !== "object") return String(value).trim();
+  if (Array.isArray(value))
+    return value.map(readable).filter(Boolean).join("；");
+  const entries = Object.entries(value);
+  const fields = new Map(entries);
+  return [
+    ...contentFields.map((key) => readable(fields.get(key))),
+    ...entries
+      .filter(([key]) => !contentFields.includes(key))
+      .map(([key, item]) => {
+        const description = readable(item);
+        return description && key + ": " + description;
+      }),
+  ]
+    .filter(Boolean)
+    .join("；");
+}
+function strings(value: unknown) {
+  return (Array.isArray(value) ? value : [value]).map(readable).filter(Boolean);
+}
+
+function metadataLine(line: string) {
+  const plain = line.replace(/[`*]/g, "").trim();
+  if (plain.length > 240) return false;
+  return plain
+    .split(/\s*[·•|｜]\s*/u)
+    .every(
+      (part) =>
+        /^(?:(?:日期|生成日期|date)\s*[:：]?\s*)?\d{4}\s*(?:[-/.年])\s*\d{1,2}\s*(?:[-/.月])\s*\d{1,2}\s*日?$/i.test(
+          part,
+        ) ||
+        /^(?:(?:协议|讨论协议|protocol)\s*[:：]?\s*)?(?:rapid-panel|adversarial-debate|council-standard)$/i.test(
+          part,
+        ) ||
+        /^(?:主题|议题|topic)[\s_-]*ID\s*[:：]?\s*[\w.-]+$/i.test(part),
+    );
+}
+function onlyLink(token: Token): boolean {
+  if (token.type === "link" || token.type === "br") return true;
+  if (token.type === "em" || token.type === "strong")
+    return token.tokens?.every(onlyLink) ?? false;
+  return token.type === "text" && !token.text.trim();
+}
+function extract(
+  text: string,
+  kind: "panelist" | "agenda_conclusion" | "report",
+) {
+  const agenda = kind === "agenda_conclusion";
+  const field = agenda ? "conclusion_summary" : "summary";
+  // A Markdown report can quote JSON evidence with its own summary field.
+  const obj =
+    kind === "report" && /^ {0,3}#{1,6}[ \t]+/m.test(text)
+      ? undefined
+      : structured(text, field);
+  if (obj) {
+    const points = strings(agenda ? obj.conclusion_key_points : obj.key_points);
+    return {
+      summary: readable(obj[field]) || points[0] || "",
+      key_points: agenda ? points : points.slice(0, 5),
+      stance_tags: strings(obj.stance_tags),
+      open_disagreements: strings(obj.open_disagreements),
+    };
+  }
+
+  const prose: string[] = [],
+    bullets: string[] = [],
+    findings: string[] = [],
+    disagreements: string[] = [];
+  let section = "",
+    summary = "",
+    tags: string[] = [];
+  function collect(tokens: Token[], list = false) {
+    for (const token of tokens) {
+      if (token.type === "heading") {
+        section = token.text.toLowerCase();
+      } else if (token.type === "blockquote") collect(token.tokens ?? [], list);
+      else if (token.type === "list") {
+        for (const item of token.items) collect(item.tokens, true);
+      } else if (token.type === "paragraph" || token.type === "text") {
+        const lines = (token.text as string)
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter((line) => {
+            if (/^stance tags\s*[:：]/i.test(line)) {
+              tags = line
+                .replace(/^stance tags\s*[:：]/i, "")
+                .split(/[,，]/)
+                .map((s) => s.trim())
+                .filter(Boolean);
+              return false;
+            }
+            if (
+              !line ||
+              line.startsWith("|") ||
+              metadataLine(line) ||
+              /^(?:目录|table of contents|contents)[:：]?$/i.test(
+                line.replace(/[\*_]/g, ""),
+              )
+            )
+              return false;
+            return !Lexer.lexInline(line).every(onlyLink);
+          });
+        const line = lines.join(" ");
+        if (!line) continue;
+        if (
+          /未决分歧|尚存分歧|open disagreements|unresolved disagreements/i.test(
+            section,
+          )
+        ) {
+          disagreements.push(line);
+          continue;
+        }
+        if (
+          /结论|主要发现|核心要点|关键要点|\b(?:findings|takeaways|conclusions|key points)\b/i.test(
+            section,
+          ) &&
+          !/摘要/.test(section)
+        )
+          findings.push(line);
+        if (list) bullets.push(line);
+        else {
+          prose.push(line);
+          if (!summary && /摘要|summary|abstract/i.test(section))
+            summary = line;
+        }
+      }
+    }
+  }
+  collect(Lexer.lex(text));
+  const lead = summary || prose[0] || bullets[0] || "";
+  const candidates = findings.filter(
+    (line) => line !== lead || bullets.includes(line),
   );
+  const points = candidates.length
+    ? candidates
+    : bullets.length
+      ? bullets
+      : prose.filter((line) => line !== lead);
+  return {
+    summary: lead.slice(0, 800),
+    key_points: agenda ? points : points.slice(0, 5),
+    stance_tags: tags,
+    open_disagreements: disagreements,
+  };
 }
-const points = z.array(z.string());
 function progress(c: Council, subId: string) {
   const runs = state(c.tree).runs.filter(
     (r) => r.subAgendaId === subId && r.kind === "panelist",
@@ -661,8 +815,8 @@ export class Orchestrator {
   private ingest(tid: string, rid: string, text: string) {
     return this.edit(tid, rid, (c, r) => {
       if (!live(r) || r.cancelRequested) return;
-      const result = extract(text);
       if (r.kind === "panelist") {
+        const { summary, key_points, stance_tags } = extract(text, r.kind);
         const con = c.create(
           "contribution",
           {
@@ -672,7 +826,9 @@ export class Orchestrator {
             kind: r.contributionKind,
             target_contribution_ids: r.targetContributionIds,
             full_content: text,
-            ...result,
+            summary: summary || "见发言全文。",
+            key_points,
+            stance_tags,
             duration_ms: Math.max(0, Date.now() - Date.parse(r.startedAt)),
           },
           r.subAgendaId,
@@ -688,8 +844,22 @@ export class Orchestrator {
         const plan = z
           .array(z.record(z.unknown()))
           .min(1)
-          .parse(structured(text).agendas);
-        for (const a of plan) c.create("agenda", a, tid, false);
+          .safeParse(structured(text, "agendas")?.agendas);
+        if (!plan.success)
+          throw Error(
+            "The moderator plan must contain a non-empty agendas array of agenda objects.",
+          );
+        for (const [index, agenda] of plan.data.entries()) {
+          try {
+            c.create("agenda", agenda, tid, false);
+          } catch (error) {
+            if (!(error instanceof z.ZodError)) throw error;
+            const issue = error.issues[0];
+            throw Error(
+              `Invalid moderator plan at agendas[${index}].${issue.path.join(".")}: ${issue.message}`,
+            );
+          }
+        }
         validateDependencies(c.tree);
         c.rollup();
       } else {
@@ -697,18 +867,27 @@ export class Orchestrator {
           title = c.tree.title;
         if (r.agendaId) title = c.get("agenda", r.agendaId).title;
         if (r.kind === "agenda_conclusion") {
-          const data = z
-            .object({
-              conclusion_summary: z.string().min(1),
-              conclusion_key_points: points,
-              open_disagreements: points,
-            })
-            .parse(structured(text));
-          c.patch("agenda", r.agendaId!, { ...data, status: "completed" });
+          const { summary, key_points, open_disagreements } = extract(
+            text,
+            r.kind,
+          );
+          if (!summary)
+            throw Error(
+              "The moderator returned no readable agenda conclusion.",
+            );
+          c.patch("agenda", r.agendaId!, {
+            conclusion_summary: summary,
+            conclusion_key_points: key_points,
+            open_disagreements,
+            status: "completed",
+          });
           body = [
-            data.conclusion_summary,
-            ...data.conclusion_key_points.map((p) => "- " + p),
-            ...data.open_disagreements.map((p) => "- " + p),
+            "## 结论摘要",
+            summary,
+            "## 关键结论",
+            key_points.map((p) => "- " + p).join("\n") || "主持人未列出关键结论。",
+            "## 未决分歧",
+            open_disagreements.map((p) => "- " + p).join("\n") || "主持人未列出未决分歧。",
           ].join("\n\n");
         }
         if (r.kind === "report" || r.publishReport)
@@ -717,12 +896,14 @@ export class Orchestrator {
             { title, agenda_id: r.agendaId ?? null, markdown_content: body },
             tid,
           ).id;
-        if (r.kind === "report" && !r.agendaId && r.completeTopic)
+        if (r.kind === "report" && !r.agendaId && r.completeTopic) {
+          const result = extract(text, r.kind);
           c.patch("topic", tid, {
             executive_summary: result.summary,
             key_takeaways: result.key_points,
             status: "completed",
           });
+        }
       }
       update(c, r, { status: "completed", finishedAt: now() });
       if (r.kind === "panelist") progress(c, r.subAgendaId!);

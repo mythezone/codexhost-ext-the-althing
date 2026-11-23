@@ -120,10 +120,10 @@ export function moderatorPrompt(kind: string, context: unknown) {
     synthesis:
       "Synthesize the evidence, consensus, minority positions and remaining uncertainty in Markdown.",
     agenda_conclusion:
-      "Return JSON with conclusion_summary, conclusion_key_points and open_disagreements.",
+      "Return only one JSON object, without commentary or a code fence. Use conclusion_summary (a non-empty string), conclusion_key_points (string[]) and open_disagreements (string[]). Each array item must be a plain string, never a nested object. Include response IDs inline in those strings. Use [] when there are no items.",
     report:
       "Write a standalone Markdown report covering methods, evidence, implications, and uncertainty. Link each relevant agenda conclusion.",
-    plan: "Return JSON with an agendas array. Each agenda has title, objective and sub_agendas with title, prompt_framing, execution_mode and optional IDs and dependencies.",
+    plan: "Return only one JSON object, without commentary or a code fence. Its agendas field is a non-empty array of objects. Each agenda has a title (non-empty string), objective (string) and sub_agendas (array). Each sub-agenda has a title (non-empty string), prompt_framing (string) and execution_mode (parallel or sequential). You may give agendas and sub-agendas string IDs in id. Set depends_on only on sub-agendas, to a string[] of other sub-agenda IDs in this topic.",
   };
   return [
     instructions[kind],
