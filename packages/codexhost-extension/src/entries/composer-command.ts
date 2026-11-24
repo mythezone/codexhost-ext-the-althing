@@ -1,11 +1,27 @@
+import {
+  isCouncilCommandPrefix,
+  parseCouncilCommand,
+  type CouncilProtocolId,
+} from "../shared/command";
+
 // Desktop and Web expose their composer DOM, but no slash-command registry.
 const composer = "[data-codex-composer-root],[data-composer-card]";
 const editable = 'textarea,[contenteditable="true"]';
-const command = /^\/althing(?:[ \t]+([^\r\n]+))?$/i;
+const nonSendControl =
+  /\b(?:cancel|stop|abort|attach|upload|file|image|photo|voice|mic|audio|record|clear|close|remove|delete|emoji|mention|slash|mode|model|thinking|settings)\b|取消|停止|附件|上传|上傳|图片|圖片|语音|語音|清除|关闭|關閉|删除|刪除|模型|设置|設定/i;
+const sendControl =
+  /\b(?:send|submit)\b|发送|發送|傳送|送信|보내기|提交/i;
+
+export type CouncilLaunch = {
+  prompt: string;
+  custom: boolean;
+  protocol?: CouncilProtocolId;
+  expertCount?: number;
+};
 
 export function installCouncilCommand(
-  launch: (topic: string) => void,
-  label: () => string,
+  launch: (command: CouncilLaunch) => void,
+  label: (instant: boolean) => string,
 ) {
   const button = document.createElement("button");
   button.type = "button";
@@ -29,7 +45,9 @@ export function installCouncilCommand(
     if (editor instanceof HTMLTextAreaElement) return editor.value.trim();
     // Most drafts are ordinary chat. Only read layout-dependent text for a possible command.
     const raw = editor.textContent ?? "";
-    return raw.trimStart().startsWith("/") ? (editor.innerText ?? raw).trim() : "";
+    return raw.trimStart().startsWith("/")
+      ? (editor.innerText ?? raw).trim()
+      : "";
   }
   function hide() {
     button.remove();
@@ -38,13 +56,12 @@ export function installCouncilCommand(
   function suggest(editor?: HTMLElement) {
     if (!editor || composing) return hide();
     const text = draft(editor);
-    if (
-      !text ||
-      !("/althing".startsWith(text.toLowerCase()) || command.test(text))
-    )
-      return hide();
+    const parsed = parseCouncilCommand(text);
+    const prefix = isCouncilCommandPrefix(text);
+    if (!text || (!parsed && !prefix)) return hide();
     source = editor;
-    button.textContent = "/althing · " + label();
+    const instant = Boolean(parsed && parsed.prompt && !parsed.custom);
+    button.textContent = "/althing · " + label(instant);
     const host = editor.closest(composer)!;
     if (button.parentElement !== host) host.append(button);
   }
@@ -60,61 +77,106 @@ export function installCouncilCommand(
         suggest(editor);
     });
   }
-  function run(event: Event, editor?: HTMLElement, allowPrefix = false) {
-    if (!editor || !editor.isConnected || composing) return;
-    const text = draft(editor),
-      match = command.exec(text);
-    if (
-      !match &&
-      !(allowPrefix && text && "/althing".startsWith(text.toLowerCase()))
-    )
-      return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
+  function replaceDraft(editor: HTMLElement, nextValue: string, expectedText: string) {
     // Apply a native editing operation so the host also updates its controlled draft.
     editor.focus({ preventScroll: true });
     if (editor instanceof HTMLTextAreaElement) {
-      editor.setRangeText("", 0, editor.value.length, "end");
+      editor.setRangeText(nextValue, 0, editor.value.length, "end");
       editor.dispatchEvent(new Event("input", { bubbles: true }));
-    } else {
-      const selection = document.getSelection();
-      if (selection) {
-        const range = document.createRange();
-        const nodes = document.createTreeWalker(editor, 4 /* SHOW_TEXT */);
-        const first = nodes.nextNode();
-        if (first) {
-          let last = first;
-          while (nodes.nextNode()) last = nodes.currentNode;
-          range.setStart(first, 0);
-          range.setEnd(last, last.textContent?.length ?? 0);
-        } else range.selectNodeContents(editor);
+      return;
+    }
+    const selection = document.getSelection();
+    if (!selection) return;
+    const range = document.createRange();
+    const nodes = document.createTreeWalker(editor, 4 /* SHOW_TEXT */);
+    const first = nodes.nextNode();
+    if (first) {
+      let last = first;
+      while (nodes.nextNode()) last = nodes.currentNode;
+      range.setStart(first, 0);
+      range.setEnd(last, last.textContent?.length ?? 0);
+    } else range.selectNodeContents(editor);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    // Rich editors such as Lexical consume beforeinput using the DOM selection.
+    document.dispatchEvent(new Event("selectionchange"));
+    if (!nextValue) {
+      const nativeDelete = editor.dispatchEvent(
+        new InputEvent("beforeinput", {
+          inputType: "deleteContentBackward",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      if (
+        nativeDelete &&
+        draft(editor) === expectedText &&
+        selection.toString().trim() === expectedText &&
+        editor.contains(selection.anchorNode) &&
+        editor.contains(selection.focusNode)
+      )
+        document.execCommand?.("delete");
+      return;
+    }
+    const nativeInsert = editor.dispatchEvent(
+      new InputEvent("beforeinput", {
+        inputType: "insertText",
+        data: nextValue,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    if (nativeInsert && draft(editor) === expectedText) {
+      if (!document.execCommand?.("insertText", false, nextValue)) {
+        editor.textContent = nextValue;
+        const end = document.createRange();
+        end.selectNodeContents(editor);
+        end.collapse(false);
         selection.removeAllRanges();
-        selection.addRange(range);
-        // Rich editors such as Lexical consume beforeinput using the DOM selection.
-        document.dispatchEvent(new Event("selectionchange"));
-        const nativeDelete = editor.dispatchEvent(
-          new InputEvent("beforeinput", {
-            inputType: "deleteContentBackward",
-            bubbles: true,
-            cancelable: true,
-          }),
-        );
-        if (
-          nativeDelete &&
-          draft(editor) === text &&
-          selection.toString().trim() === text &&
-          editor.contains(selection.anchorNode) &&
-          editor.contains(selection.focusNode)
-        )
-          document.execCommand?.("delete");
+        selection.addRange(end);
+        editor.dispatchEvent(new Event("input", { bubbles: true }));
       }
     }
+  }
+  function run(event: Event, editor?: HTMLElement, allowPrefix = false) {
+    if (!editor || !editor.isConnected || composing) return;
+    const text = draft(editor);
+    const parsed = parseCouncilCommand(text);
+    if (!parsed && !(allowPrefix && isCouncilCommandPrefix(text))) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    replaceDraft(editor, "", text);
     hide();
-    launch(match?.[1]?.trim() || "");
+    launch({
+      prompt: parsed?.prompt ?? "",
+      custom: parsed?.custom ?? false,
+      ...(parsed?.protocol ? { protocol: parsed.protocol } : {}),
+      ...(parsed?.expertCount ? { expertCount: parsed.expertCount } : {}),
+    });
   }
   function key(event: KeyboardEvent) {
     if (event.key === "Escape") {
       hide();
+      return;
+    }
+    if (
+      event.key === "Tab" &&
+      !event.isComposing &&
+      event.keyCode !== 229 &&
+      !event.shiftKey &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey
+    ) {
+      const editor = editorOf(event.target);
+      if (!editor || composing) return;
+      const text = draft(editor);
+      if (isCouncilCommandPrefix(text) && text.toLowerCase() !== "/althing") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        replaceDraft(editor, "/althing ", text);
+        suggest(editor);
+      }
       return;
     }
     if (
@@ -128,6 +190,17 @@ export function installCouncilCommand(
     )
       run(event, editorOf(event.target));
   }
+  function isSendButton(control: HTMLButtonElement) {
+    if (control === button) return false;
+    if (control.matches('[type="submit"]')) return true;
+    const labels = [
+      control.getAttribute("aria-label") || "",
+      control.title || "",
+      control.dataset.testid || "",
+    ].join(" ");
+    if (!labels.trim() || nonSendControl.test(labels)) return false;
+    return sendControl.test(labels);
+  }
   function send(event: Event) {
     const target = event.target;
     if (!(target instanceof Element)) return;
@@ -137,19 +210,7 @@ export function installCouncilCommand(
     if (!host) return;
     if (event.type === "click") {
       const control = target.closest("button");
-      if (!control || control === button) return;
-      const name =
-        control.getAttribute("aria-label") ||
-        control.title ||
-        control.dataset.testid ||
-        "";
-      if (
-        !control.matches('[type="submit"]') &&
-        !/^(?:send(?: message|-button)?|submit|发送(?:消息)?|發送(?:訊息|消息)?|傳送(?:訊息)?|(?:メッセージを)?送信(?:する)?|(?:메시지 )?보내기|提交)$/i.test(
-          name,
-        )
-      )
-        return;
+      if (!control || !isSendButton(control)) return;
     }
     run(event, editorOf(host.querySelector(editable)));
   }

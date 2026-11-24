@@ -1,6 +1,9 @@
 import { resolveLocale } from "../shared/i18n.ts";
+import { splitPrompt, type CouncilProtocolId } from "../shared/command.ts";
 import { publicationHtml } from "./domain/rendering.ts";
 import { sameAssignment } from "../shared/agents.ts";
+import { recommendPanel } from "./smart-panel.ts";
+import path from "node:path";
 import { z } from "zod";
 import { jsonBytes } from "./json-bytes.ts";
 import { Store, resolveDataDir, archivePath } from "./storage.ts";
@@ -54,6 +57,9 @@ const handlers = [
   "council/conclude-agenda",
   "council/generate-report",
   "council/plan-topic",
+  "council/recommend-panel",
+  "council/convene",
+  "council/set-auto-dispatch",
   "council/cancel-run",
   "council/retry-run",
   "council/runs",
@@ -80,6 +86,8 @@ const hostConfig = z
       .object({ role: z.string(), reasoning_effort: z.string() })
       .nullable()
       .optional(),
+    auto_dispatch: z.boolean().optional(),
+    auto_assign_roles: z.boolean().optional(),
   })
   .strict();
 function metadata(value: unknown, existing?: Json) {
@@ -324,6 +332,215 @@ export async function engine(
         return council.moderate("report", tid(), { ...p, locale });
       case "council/plan-topic":
         return council.moderate("plan", tid(), { ...p, locale });
+      case "council/recommend-panel": {
+        const req = z
+          .object({
+            prompt: z.string().optional(),
+            cwd: z.string().optional(),
+            protocol: z
+              .enum(["council-standard", "adversarial-debate", "rapid-panel"])
+              .optional(),
+            expertCount: z.number().int().min(1).max(6).optional(),
+            locale: z.string().optional(),
+          })
+          .strict()
+          .parse(p);
+        let workspace = req.cwd?.trim() || "";
+        let workspaceLabel = "";
+        if (!workspace || !path.isAbsolute(workspace)) {
+          try {
+            const found = await bridge.workspaces({ limit: 20 });
+            const first = found.projects[0] as
+              | { cwd?: string; name?: string }
+              | undefined;
+            if (first?.cwd && path.isAbsolute(first.cwd)) {
+              workspace = first.cwd;
+              workspaceLabel = String(first.name || "");
+            }
+          } catch {
+            // Allow graceful offline preview without crashing.
+          }
+        }
+        if (workspace && !workspaceLabel) {
+          workspaceLabel =
+            workspace.split(/[\\/]/).filter(Boolean).pop() || workspace;
+        }
+        const agents = await bridge
+          .listAgents(workspace || undefined)
+          .then((r) => r.agents)
+          .catch(() => []);
+        const defaultProtocol = (
+          ["council-standard", "adversarial-debate", "rapid-panel"].includes(
+            String(settings.defaultProtocol),
+          )
+            ? settings.defaultProtocol
+            : "council-standard"
+        ) as CouncilProtocolId;
+        return recommendPanel({
+          prompt: req.prompt,
+          agents,
+          workspace,
+          workspaceLabel,
+          protocol: req.protocol,
+          defaultProtocol,
+          expertCount: req.expertCount,
+          locale,
+        });
+      }
+      case "council/convene": {
+        const req = z
+          .object({
+            prompt: z.string().optional(),
+            title: z.string().optional(),
+            subtitle: z.string().optional(),
+            description: z.string().optional(),
+            domain_tags: z.array(z.string()).optional(),
+            cwd: z.string().optional(),
+            protocol: z
+              .enum(["council-standard", "adversarial-debate", "rapid-panel"])
+              .optional(),
+            expertCount: z.number().int().min(1).max(6).optional(),
+            autoDispatch: z.boolean().optional(),
+            planWithAi: z.boolean().optional(),
+            planningPrompt: z.string().optional(),
+            locale: z.string().optional(),
+            panelists: z.array(z.record(z.unknown())).optional(),
+            moderator: z.record(z.unknown()).optional(),
+            host: z.record(z.unknown()).optional(),
+            agendas: z.array(z.record(z.unknown())).optional(),
+          })
+          .strict()
+          .parse(p);
+        const promptText = (req.prompt ?? "").trim();
+        const split = splitPrompt(promptText);
+        const title = (req.title?.trim() || split.title).trim();
+        if (!title) throw Error("Council title or prompt is required.");
+        const description =
+          req.description !== undefined ? req.description : split.description;
+
+        let workspace = req.cwd?.trim() || "";
+        let workspaceLabel = "";
+        const projects = await bridge
+          .workspaces({ limit: 50 })
+          .then((r) => r.projects as { cwd?: string; name?: string }[])
+          .catch(() => []);
+        if (workspace && path.isAbsolute(workspace)) {
+          workspaceLabel =
+            projects.find((item) => item.cwd === workspace)?.name ||
+            workspace.split(/[\\/]/).filter(Boolean).pop() ||
+            workspace;
+        } else {
+          const first = projects.find(
+            (item) => typeof item.cwd === "string" && path.isAbsolute(item.cwd),
+          );
+          if (first?.cwd) {
+            workspace = first.cwd;
+            workspaceLabel =
+              first.name ||
+              workspace.split(/[\\/]/).filter(Boolean).pop() ||
+              workspace;
+          }
+        }
+
+        const customPanel = !!(req.panelists && req.panelists.length > 0);
+        const manualAgendas = !!(req.agendas && req.agendas.length > 0);
+        const shouldPlan = req.planWithAi !== false && !manualAgendas;
+
+        if (shouldPlan && !path.isAbsolute(workspace)) {
+          throw Error(
+            "NO_WORKSPACE: Choose a project workspace to convene a council.",
+          );
+        }
+
+        const defaultProtocol = (
+          ["council-standard", "adversarial-debate", "rapid-panel"].includes(
+            String(settings.defaultProtocol),
+          )
+            ? settings.defaultProtocol
+            : "council-standard"
+        ) as CouncilProtocolId;
+
+        let recommendation = null;
+        if (!customPanel) {
+          const { agents } = await bridge.listAgents(workspace || undefined);
+          recommendation = recommendPanel({
+            prompt: promptText || title,
+            agents,
+            workspace,
+            workspaceLabel,
+            protocol: req.protocol,
+            defaultProtocol,
+            expertCount: req.expertCount,
+            locale,
+          });
+          if (!recommendation.readyCount) {
+            throw Error(
+              "NO_READY_AGENTS: No ready CodexHost agents are available.",
+            );
+          }
+        }
+
+        const protocol =
+          req.protocol ?? recommendation?.protocol ?? defaultProtocol;
+        const shouldAutoDispatch =
+          shouldPlan &&
+          (req.autoDispatch ?? settings.autoStartCouncil !== false);
+        const shouldRefineRoles = shouldPlan && !customPanel;
+
+        const hostMeta = {
+          project_cwd: workspace,
+          project_label: workspaceLabel,
+          ...(customPanel ? (req.host ?? {}) : (recommendation?.host ?? {})),
+          auto_dispatch: shouldAutoDispatch,
+          auto_assign_roles: shouldRefineRoles,
+        };
+
+        const created = await store.transaction(null, (c) => {
+          c.create("topic", {
+            title,
+            subtitle: req.subtitle ?? "",
+            description,
+            domain_tags: req.domain_tags ?? [],
+            protocol_id: protocol,
+            status: shouldPlan ? "in_progress" : "draft",
+            panelists: customPanel
+              ? req.panelists
+              : (recommendation?.panelists ?? []),
+            moderator: customPanel
+              ? (req.moderator ?? {})
+              : (recommendation?.moderator ?? {}),
+            metadata: metadata({ codexhost: hostMeta }),
+            agendas: manualAgendas ? req.agendas : [],
+          });
+          return hydrate(c.tree);
+        });
+
+        let planRun = null;
+        if (shouldPlan) {
+          planRun = await council.moderate("plan", created.id, {
+            locale,
+            ...(req.planningPrompt?.trim()
+              ? { prompt: req.planningPrompt.trim() }
+              : {}),
+          });
+        }
+        const latest = await store.serial(async () =>
+          hydrate(await store.load(created.id)),
+        );
+        return { topic: latest, planRun, recommendation };
+      }
+      case "council/set-auto-dispatch": {
+        const enabled = z.boolean().parse(p.enabled);
+        return store.transaction(tid(), (c) => {
+          const existing = input(c.tree.metadata.codexhost ?? {});
+          c.tree.metadata.codexhost = json.parse({
+            ...existing,
+            auto_dispatch: enabled,
+          });
+          c.emit("topic.updated", c.tree.id);
+          return { auto_dispatch: enabled };
+        });
+      }
       case "council/cancel-run":
         return council.cancel(tid(), id.parse(p.runId));
       case "council/retry-run":

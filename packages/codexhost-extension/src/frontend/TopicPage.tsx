@@ -27,7 +27,7 @@ export function TopicPage({
   initial: Destination;
 }) {
   const l = useL(),
-    { rpc, busy, perform } = useWorkspace(),
+    { rpc, runs, surface, busy, perform } = useWorkspace(),
     root = useRef<HTMLElement>(null),
     [tab, setTab] = useState(initial.tab || "overview"),
     [subId, setSub] = useState(initial.sub || ""),
@@ -111,6 +111,30 @@ export function TopicPage({
       : a
         ? t.reports.filter((r) => r.agenda_id === a.id)
         : t.reports;
+  const planRun = [...runs].reverse().find((r) => r.kind === "plan");
+  const planning =
+    !!planRun && ["queued", "running"].includes(planRun.status);
+  const openingRuns = runs.filter(
+    (r) => r.kind === "panelist" && r.roundNumber === 1,
+  );
+  const openingLive = openingRuns.some((r) =>
+    ["queued", "running"].includes(r.status),
+  );
+  const openingDone = openingRuns.filter(
+    (r) => r.status === "completed",
+  ).length;
+  const hostMeta = (t.metadata.codexhost || {}) as {
+    auto_dispatch?: boolean;
+  };
+  const autoDispatchOn = Boolean(hostMeta.auto_dispatch);
+  const activeOpeningSubId =
+    openingRuns.find((r) => ["queued", "running"].includes(r.status))
+      ?.subAgendaId || openingRuns[0]?.subAgendaId;
+  const activeOpeningAgenda = activeOpeningSubId
+    ? t.agendas.find((ag) =>
+        ag.sub_agendas.some((sub) => sub.id === activeOpeningSubId),
+      )
+    : undefined;
   return (
     <main
       className="topic-body"
@@ -192,32 +216,138 @@ export function TopicPage({
       />
       {tab === "overview" && (
         <>
-          <section className="panel">
-            <h2>{l("Council brief", "议题概览")}</h2>
-            <Markdown text={t.subtitle} />
-            <Markdown text={t.description} />
-            <div className="tools">
-              {t.domain_tags.map((tag) => (
-                <span className="tag" key={tag}>
-                  {tag}
-                </span>
-              ))}
-            </div>
-
-            {!t.agendas.length && (
-              <div className="tools">
-                <button onClick={() => show("agenda")}>
-                  {l("Add first agenda", "添加首个议程")}
-                </button>
-                <button
-                  disabled={busy}
-                  onClick={() => call("council/plan-topic")}
-                >
-                  {l("Plan with AI", "使用 AI 规划")}
-                </button>
+          {(planning || openingLive) && (
+            <section className="panel kickoff-card" aria-live="polite">
+              <div className="card-heading">
+                <h2>
+                  {planning
+                    ? l("Convening council…", "正在召开议会…")
+                    : l("Opening round in progress", "首轮讨论进行中")}
+                </h2>
+                <Status value={planning ? "in_progress" : "dispatching"} />
               </div>
-            )}
-          </section>
+              <ol className="kickoff-steps">
+                <li data-state="done">
+                  {t.panelists.length}{" "}
+                  {l("seats assigned", "位专家已分配")}
+                </li>
+                <li data-state={planning ? "active" : "done"}>
+                  {planning
+                    ? l(
+                        "Planning agendas & tailoring roles…",
+                        "主持人正在规划议程与细化角色…",
+                      )
+                    : l("Agendas ready", "议程已就绪")}
+                </li>
+                <li
+                  data-state={
+                    openingLive ? "active" : autoDispatchOn ? "pending" : "paused"
+                  }
+                >
+                  {openingLive
+                    ? `${openingDone}/${openingRuns.length} ${l(
+                        "experts responding",
+                        "位专家已回应",
+                      )}`
+                    : autoDispatchOn
+                      ? l(
+                          "Opening round will start automatically",
+                          "规划完成后将自动派发首轮讨论",
+                        )
+                      : l(
+                          "Auto-dispatch paused",
+                          "已暂停自动派发首轮讨论",
+                        )}
+                </li>
+              </ol>
+              {t.panelists.length > 0 && (
+                <div className="seat-chips">
+                  {t.panelists.map((p) => (
+                    <span className="seat-chip" key={p.id}>
+                      <b>{p.name}</b>
+                      {p.role && <small>{p.role}</small>}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {planning && planRun?.progressText && (
+                <p className="small">{planRun.progressText}</p>
+              )}
+              <div className="tools">
+                {openingLive && activeOpeningAgenda && activeOpeningSubId && (
+                  <button
+                    className="primary"
+                    onClick={() =>
+                      pick(activeOpeningAgenda.id, activeOpeningSubId)
+                    }
+                  >
+                    {l("Follow live discussion", "前往实时讨论")}
+                  </button>
+                )}
+                {planning && (
+                  <button
+                    disabled={busy}
+                    onClick={() =>
+                      call("council/set-auto-dispatch", {
+                        enabled: !autoDispatchOn,
+                      })
+                    }
+                  >
+                    {autoDispatchOn
+                      ? l("Pause auto-dispatch", "暂停自动派发")
+                      : l("Resume auto-dispatch", "恢复自动派发")}
+                  </button>
+                )}
+                {planning && planRun?.threadId && surface.openThread && (
+                  <button
+                    onClick={() =>
+                      void perform(() => surface.openThread!(planRun.threadId!))
+                    }
+                  >
+                    {l("Open Thread", "打开子会话")}
+                  </button>
+                )}
+                {t.status !== "archived" && (
+                  <button onClick={() => show("roles")}>
+                    {l("Configure roles & agents", "配置专家与角色")}
+                  </button>
+                )}
+              </div>
+            </section>
+          )}
+          {(t.subtitle ||
+            t.description ||
+            t.domain_tags.length > 0 ||
+            (!t.agendas.length && !planning)) && (
+            <section className="panel">
+              <h2>{l("Council brief", "议题概览")}</h2>
+              <Markdown text={t.subtitle} />
+              <Markdown text={t.description} />
+              {t.domain_tags.length > 0 && (
+                <div className="tools">
+                  {t.domain_tags.map((tag) => (
+                    <span className="tag" key={tag}>
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {!t.agendas.length && !planning && (
+                <div className="tools">
+                  <button onClick={() => show("agenda")}>
+                    {l("Add first agenda", "添加首个议程")}
+                  </button>
+                  <button
+                    disabled={busy}
+                    onClick={() => call("council/plan-topic")}
+                  >
+                    {l("Plan with AI", "使用 AI 规划")}
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
           <Overview topic={t} select={pick} open={setReport} />
         </>
       )}

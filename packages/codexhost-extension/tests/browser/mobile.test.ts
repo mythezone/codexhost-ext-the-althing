@@ -540,17 +540,23 @@ for (const engine of [chromium, webkit]) {
         await enter.last().waitFor();
         await check("hub");
         await root.getByRole("button", { name: "New Council" }).tap();
-        await dialog.locator("input[required]").fill(longTitle);
+        await dialog.getByLabel("Title", { exact: true }).fill(longTitle);
+        await check("wizard quick convene");
+        await dialog.locator(".customize-drawer > summary").tap();
         await check("wizard details");
-        await dialog.getByRole("button", { name: "Continue" }).tap();
         await dialog.getByRole("button", { name: /Add expert/ }).tap();
-        await dialog.getByRole("button", {name:"Add collaboration experts"}).tap();
+        const addCollab = dialog.getByRole("button", {
+          name: "Add collaboration experts",
+        });
+        if (await addCollab.isEnabled()) await addCollab.tap();
         await check("wizard roster");
         await dialog
           .getByRole("button", { name: /Remove expert/ })
           .last()
           .tap();
-        await dialog.getByRole("button", { name: "Continue" }).tap();
+        await dialog
+          .getByLabel("Ask the moderator to propose agendas and sub-agendas")
+          .tap();
         await dialog.getByRole("button", { name: /Add agenda/ }).tap();
         await dialog
           .getByRole("button", { name: /Add sub-agenda/ })
@@ -670,26 +676,37 @@ for (const engine of [chromium, webkit]) {
       });
       const editor = page.locator("[data-composer-input]");
       const workspace = page.locator("[data-althing-web-workspace]");
-      for (const mode of ["hint", "enter"]) {
-        const subject = mode === "enter" ? "通勤研究" : "";
-        await editor.fill(mode === "hint" ? "/alt" : "/althing " + subject);
-        if (mode === "hint")
-          await page.getByRole("button", { name: /\/althing/ }).tap();
-        else await editor.press("Enter");
-        await workspace.getByRole("dialog").waitFor();
-        assert.equal(
-          await workspace.getByLabel("Title", { exact: true }).inputValue(),
-          subject,
-        );
-        assert.equal((await editor.innerText()).trim(), "");
-        const bounds = await workspace
-          .locator(".althing-ext-root")
-          .evaluate(measureBounds, 375);
-        assert.deepEqual(bounds.problems, []);
-        await workspace.getByLabel("Close", { exact: true }).tap();
-        await workspace.getByRole("button", { name: "Back to chat" }).tap();
-        await workspace.waitFor({ state: "detached" });
-      }
+      // Prefix hint opens 1-screen Quick Convene dialog with zero bounds overflow
+      await editor.fill("/alt");
+      await page.getByRole("button", { name: /\/althing/ }).tap();
+      await workspace.getByRole("dialog").waitFor();
+      assert.equal(
+        await workspace.getByLabel("Title", { exact: true }).inputValue(),
+        "",
+      );
+      assert.equal((await editor.innerText()).trim(), "");
+      const dialogBounds = await workspace
+        .locator(".althing-ext-root")
+        .evaluate(measureBounds, 375);
+      assert.deepEqual(dialogBounds.problems, []);
+      await workspace.getByLabel("Close", { exact: true }).tap();
+      await workspace.getByRole("button", { name: "Back to chat" }).tap();
+      await workspace.waitFor({ state: "detached" });
+
+      // /althing <topic> + Enter directly convenes and opens the live Council page (no dialog!)
+      await editor.fill("/althing 通勤研究");
+      await editor.press("Enter");
+      await workspace
+        .getByRole("heading", { name: "通勤研究", level: 1 })
+        .waitFor();
+      assert.equal(await workspace.getByRole("dialog").count(), 0);
+      assert.equal((await editor.innerText()).trim(), "");
+      const liveBounds = await workspace
+        .locator(".althing-ext-root")
+        .evaluate(measureBounds, 375);
+      assert.deepEqual(liveBounds.problems, []);
+      await workspace.getByRole("button", { name: "Back to chat" }).tap();
+      await workspace.waitFor({ state: "detached" });
     },
   );
 }

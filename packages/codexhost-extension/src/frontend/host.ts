@@ -16,6 +16,10 @@ export type Destination = {
   projectCwd?: string;
   newCouncil?: boolean;
   commandTopic?: string;
+  convenePrompt?: string;
+  conveneProtocol?: "council-standard" | "adversarial-debate" | "rapid-panel";
+  conveneExpertCount?: number;
+  customSetup?: boolean;
   tab?: string;
   sub?: string;
   reportId?: string;

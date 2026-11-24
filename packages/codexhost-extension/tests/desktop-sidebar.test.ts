@@ -117,11 +117,11 @@ test("Desktop classic entry coexists with thread tree, tracks geometry, yields t
     const hint = () =>
       composer.querySelector("[data-althing-command]")?.textContent;
     for (const [language, title, command] of [
-      ["zh-CN", "议事厅", "发起会议"],
-      ["zh-HK", "議事廳", "發起會議"],
-      ["ja-JP", "評議会", "会議を開く"],
-      ["ko-KR", "의회", "회의 시작"],
-      ["en", "The Althing", "Start a council"],
+      ["zh-CN", "议事厅", "回车直接召开议会"],
+      ["zh-HK", "議事廳", "Enter 直接召開議會"],
+      ["ja-JP", "評議会", "Enter で会議をすぐ開く"],
+      ["ko-KR", "의회", "Enter로 바로 회의 열기"],
+      ["en", "The Althing", "Press Enter to convene council"],
     ]) {
       for (const cb of h.languages) cb(language);
       await eventually(
@@ -133,17 +133,18 @@ test("Desktop classic entry coexists with thread tree, tracks geometry, yields t
     for (const cb of h.listeners) cb({ language: "ja" });
     await eventually(
       () =>
-        hint()?.endsWith("会議を開く") &&
+        hint()?.endsWith("Enter で会議をすぐ開く") &&
         owned("group-header")?.textContent?.includes("評議会"),
     );
     for (const cb of h.listeners) cb({ language: "auto" });
-    await eventually(() => hint()?.endsWith("Start a council"));
+    await eventually(() => hint()?.endsWith("Press Enter to convene council"));
     fireEvent.keyDown(prompt, { key: "Enter" });
     const commandOverlay = await eventually(() => owned("overlay"));
-    await eventually(
-      () =>
-        (query(commandOverlay).getByLabelText("Title") as HTMLInputElement)
-          .value === "Desktop meeting",
+    await eventually(() =>
+      query(commandOverlay).getByRole("heading", {
+        name: "Desktop meeting",
+        level: 1,
+      }),
     );
     fireEvent.click(document.querySelector("[data-sidebar-destination]")!);
     await eventually(() => !owned("overlay"));

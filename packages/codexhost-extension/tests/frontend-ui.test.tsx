@@ -65,7 +65,7 @@ test("Hub filters projects, scopes themes, and follows Host locale without chang
 function locationHref() {
   return window.location.href;
 }
-test("New Council wizard uses workspace, advertised fast model, supported thinking, moderator and nested agendas", async (t) => {
+test("New Council modal supports 1-click smart convene and full manual customization", async (t) => {
   dom(t);
   const h = mockUI(),
     root = document.createElement("div");
@@ -73,6 +73,29 @@ test("New Council wizard uses workspace, advertised fast model, supported thinki
   const dispose = await mount(root, h.api);
   try {
     const ui = await eventually(() => query(root));
+    // Hub inline quick-convene bar launches directly into live Kickoff card
+    fireEvent.change(
+      await eventually(() => ui.getByLabelText("Quick convene topic")),
+      { target: { value: "Instant hub question" } },
+    );
+    fireEvent.click(ui.getByRole("button", { name: "Convene" }));
+    await eventually(() =>
+      ui.getByRole("heading", { name: "Instant hub question", level: 1 }),
+    );
+    assert.ok(ui.getByRole("heading", { name: "Convening council…" }));
+    fireEvent.click(
+      await eventually(() =>
+        ui.getByRole("button", { name: "Pause auto-dispatch" }),
+      ),
+    );
+    await eventually(() =>
+      h.calls.some(
+        (x) => x.method === "council/set-auto-dispatch" && x.p.enabled === false,
+      ),
+    );
+    fireEvent.click(ui.getByRole("button", { name: "Councils" }));
+
+    // 1-screen Quick Convene modal with expanded manual customization
     fireEvent.click(
       await eventually(() => ui.getByRole("button", { name: "New Council" })),
     );
@@ -81,16 +104,33 @@ test("New Council wizard uses workspace, advertised fast model, supported thinki
       fireEvent.change(await eventually(() => wizard.getByLabelText(label)), {
         target: { value },
       });
+    await eventually(() => wizard.getByText("Smart panel allocation"));
     await field("Title", "Methods review");
+    fireEvent.click(
+      wizard.getByText("Customize seats, protocol & agendas"),
+    );
     await field("Project workspace", "/projects/study");
     assert.equal(
       (wizard.getByLabelText("Discussion protocol") as HTMLSelectElement).value,
       "rapid-panel",
     );
-    fireEvent.click(wizard.getByText("Continue"));
-    fireEvent.click(
-      await eventually(() => wizard.getByText("Add expert", { exact: false })),
-    );
+    // Wait for smart defaults to populate seats, then customize seat 1 and moderator
+    await eventually(() => wizard.getAllByLabelText("Harness").length >= 1);
+    const initialSeats = wizard.queryAllByRole("button", {
+      name: "Remove expert",
+    }).length;
+    for (let remaining = initialSeats; remaining > 1; remaining--) {
+      fireEvent.click(
+        wizard.getAllByRole("button", { name: "Remove expert" })[
+          remaining - 1
+        ],
+      );
+      await eventually(
+        () =>
+          wizard.queryAllByRole("button", { name: "Remove expert" }).length ===
+          remaining - 1,
+      );
+    }
     await field("Display name", "Reviewer");
     await field("Role preset", "General review");
     assert.equal(
@@ -122,7 +162,11 @@ test("New Council wizard uses workspace, advertised fast model, supported thinki
       () => wizard.getAllByLabelText("Harness")[1],
     );
     fireEvent.change(chair, { target: { value: "other" } });
-    fireEvent.click(wizard.getByText("Continue"));
+    fireEvent.click(
+      wizard.getByLabelText(
+        "Ask the moderator to propose agendas and sub-agendas",
+      ),
+    );
     fireEvent.click(
       await eventually(() => wizard.getByText("Add agenda", { exact: false })),
     );
@@ -132,12 +176,17 @@ test("New Council wizard uses workspace, advertised fast model, supported thinki
     await field("Execution", "sequential");
     fireEvent.click(wizard.getByRole("button", { name: "Create council" }));
     const data = (
-      await eventually(() => h.calls.find((x) => x.method === "topics/create"))
-    ).p.data;
-    assert.equal(data.metadata.codexhost.project_cwd, "/projects/study");
-    assert.equal(data.metadata.codexhost.moderator_config.harnessId, "other");
+      await eventually(() =>
+        h.calls.find(
+          (x) =>
+            x.method === "council/convene" && x.p.prompt === "Methods review",
+        ),
+      )
+    ).p;
+    assert.equal(data.cwd, "/projects/study");
+    assert.equal(data.host.moderator_config.harnessId, "other");
     assert.deepEqual(
-      data.metadata.codexhost.panelist_threads[data.panelists[0].id],
+      data.host.panelist_threads[data.panelists[0].id],
       { harnessId: "codex", model: { id: "sol~fast" }, thinking: "high" },
     );
     assert.equal(data.panelists[0].reasoning_effort, "High");
@@ -618,6 +667,44 @@ test("edit an existing roster, add collaboration defaults, choose roles and save
         .getByRole("table")
         .textContent?.includes("Architecture & technical design"),
     );
+  } finally {
+    dispose();
+  }
+});
+
+test("instant convene gracefully falls back to Quick Convene modal when no ready agents exist", async (t) => {
+  dom(t);
+  const h = mockUI(),
+    root = document.createElement("div");
+  document.body.append(root);
+  const normal = h.api.backend.invoke.bind(h.api.backend);
+  const api = {
+    ...h.api,
+    backend: {
+      invoke: async (name: string, p: any) => {
+        if (name === "althing/council/convene") {
+          throw Error(
+            "NO_READY_AGENTS: No ready CodexHost agents are available.",
+          );
+        }
+        return normal(name, p);
+      },
+    },
+  };
+  const dispose = await mount(root, api);
+  try {
+    const ui = await eventually(() => query(root));
+    fireEvent.change(
+      await eventually(() => ui.getByLabelText("Quick convene topic")),
+      { target: { value: "Offline fallback check" } },
+    );
+    fireEvent.click(ui.getByRole("button", { name: "Convene" }));
+    const dialog = within(await eventually(() => ui.getByRole("dialog")));
+    assert.equal(
+      (dialog.getByLabelText("Title") as HTMLTextAreaElement).value,
+      "Offline fallback check",
+    );
+    assert.match(dialog.getByRole("alert").textContent || "", /No ready CodexHost agents/);
   } finally {
     dispose();
   }

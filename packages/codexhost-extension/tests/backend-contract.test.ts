@@ -278,6 +278,20 @@ test("built entry registers and exercises every RPC, including delegation, archi
     await call("council/conclude-agenda", { ...p, agendaId: "a" });
     await call("council/generate-report", p);
     await call("council/plan-topic", p);
+    const rec = await call("council/recommend-panel", {
+      prompt: "Evaluate caching architecture",
+    });
+    assert.ok(rec.readyCount >= 1 && rec.panelists.length >= 1);
+    const convened = await call("council/convene", {
+      prompt: "Quick contract convene",
+      planWithAi: false,
+    });
+    assert.equal(convened.topic.title, "Quick contract convene");
+    await call("council/set-auto-dispatch", {
+      topicId: convened.topic.id,
+      enabled: false,
+    });
+    await call("topics/delete", { topicId: convened.topic.id });
     assert.ok((await call("events/since", { cursor: 0 })).activeRunCount >= 4);
     await assert.rejects(call("operations/get", { operationId: "unknown" }));
     assert.deepEqual(

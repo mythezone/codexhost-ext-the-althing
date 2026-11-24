@@ -410,9 +410,53 @@ function activate(api: Desktop) {
       "data-app-action-sidebar-section-collapsed",
     ],
   });
+  function activeProjectCwd() {
+    const activeSelector =
+      '[aria-current],[aria-selected="true"],[data-active="true"],[data-selected="true"]';
+    for (const r of rows) {
+      if (!r.threadId) continue;
+      if (
+        r.element.matches(activeSelector) ||
+        r.element.querySelector(activeSelector)
+      ) {
+        const cwd = threads.get(r.threadId);
+        if (cwd) return cwd;
+      }
+    }
+    const activeProject = document.querySelector(
+      "[data-project-cwd][aria-current],[data-project-cwd][data-active='true'],[data-project-path][aria-current],[data-project-path][data-active='true']",
+    );
+    const attrCwd =
+      activeProject?.getAttribute("data-project-cwd") ||
+      activeProject?.getAttribute("data-project-path");
+    if (attrCwd) return attrCwd;
+    return known.length === 1 ? known[0].cwd : undefined;
+  }
   const offCommand = installCouncilCommand(
-    (commandTopic) => open({ newCouncil: true, commandTopic }),
-    () => translate("Start a council", "发起会议"),
+    (cmd) => {
+      const projectCwd = activeProjectCwd();
+      if (cmd.prompt && !cmd.custom) {
+        open({
+          convenePrompt: cmd.prompt,
+          conveneProtocol: cmd.protocol,
+          conveneExpertCount: cmd.expertCount,
+          projectCwd,
+        });
+      } else {
+        open({
+          newCouncil: true,
+          commandTopic: cmd.prompt,
+          conveneProtocol: cmd.protocol,
+          conveneExpertCount: cmd.expertCount,
+          customSetup: cmd.custom,
+          projectCwd,
+        });
+      }
+    },
+    (instant) =>
+      instant
+        ? translate("Press Enter to convene council", "回车直接召开议会")
+        : translate("Start a council", "发起会议"),
   );
   const offRows = api.sidebar.observeRows((r) => {
     rows = r;

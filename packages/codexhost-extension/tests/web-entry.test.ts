@@ -99,7 +99,7 @@ test("native Web tracks document language and system appearance without page-onl
   }
 });
 
-test("chat command selects a moderator, plans a topic via the backend, and waits for expert dispatch", async (t) => {
+test("chat command directly convenes a council with smart allocation, Tab autocomplete, and custom override", async (t) => {
   dom(t);
   const h = mockUI(),
     host = await mockHost(t);
@@ -141,40 +141,44 @@ test("chat command selects a moderator, plans a topic via the backend, and waits
       document.querySelector<HTMLElement>("[data-althing-web-workspace]");
     const enter = (options = {}) =>
       fireEvent.keyDown(input, { key: "Enter", ...options });
-    for (const text of [
-      "ordinary prompt",
-      "/althings",
-      "prefix /althing",
-      "/althing\nkeep this draft",
-    ]) {
+    for (const text of ["ordinary prompt", "/althings", "prefix /althing"]) {
       input.value = text;
       assert.equal(enter(), true);
       assert.equal(mounted(), null);
       assert.equal(input.value, text);
     }
-    input.value = "/althing Transit study";
+
+    // Tab autocomplete from /alt -> /althing 
+    input.value = "/alt";
+    fireEvent.input(input);
+    const hint = () =>
+      shell.querySelector("[data-althing-command]")?.textContent;
+    await eventually(() => hint()?.endsWith("Start a council"));
+    assert.equal(fireEvent.keyDown(input, { key: "Tab" }), false);
+    assert.equal(input.value, "/althing ");
+
+    // Multi-line direct convene via Send button (including localized Send label)
+    input.value = "/althing Transit study\nCompare weekday service.";
     assert.equal(enter({ shiftKey: true }), true);
     assert.equal(enter({ isComposing: true }), true);
     assert.equal(mounted(), null);
     fireEvent.input(input);
-    const hint = () =>
-      shell.querySelector("[data-althing-command]")?.textContent;
     document.documentElement.lang = "zh-HK";
-    await eventually(() => hint()?.endsWith("Start a council"));
+    await eventually(() => hint()?.endsWith("Press Enter to convene council"));
     for (const [language, translation] of [
-      ["zh-CN", "发起会议"],
-      ["zh-TW", "發起會議"],
-      ["ja", "会議を開く"],
-      ["ko", "회의 시작"],
-      ["en", "Start a council"],
+      ["zh-CN", "回车直接召开议会"],
+      ["zh-TW", "Enter 直接召開議會"],
+      ["ja", "Enter で会議をすぐ開く"],
+      ["ko", "Enter로 바로 회의 열기"],
+      ["en", "Press Enter to convene council"],
     ]) {
       for (const change of h.languages) change(language);
       await eventually(() => hint()?.endsWith(translation));
     }
     for (const change of h.listeners) change({ language: "ja" });
-    await eventually(() => hint()?.endsWith("会議を開く"));
+    await eventually(() => hint()?.endsWith("Enter で会議をすぐ開く"));
     for (const change of h.listeners) change({ language: "auto" });
-    await eventually(() => hint()?.endsWith("Start a council"));
+    await eventually(() => hint()?.endsWith("Press Enter to convene council"));
     shell
       .querySelector("button[aria-label]")!
       .setAttribute("aria-label", "送信");
@@ -182,46 +186,22 @@ test("chat command selects a moderator, plans a topic via the backend, and waits
       fireEvent.click(shell.querySelector("button[aria-label]")!),
       false,
     );
+
     const surface = await eventually(mounted);
     const ui = await eventually(() => query(surface));
-    const dialog = within(await eventually(() => ui.getByRole("dialog")));
-    assert.equal(
-      (dialog.getByLabelText("Title") as HTMLInputElement).value,
-      "Transit study",
-    );
     assert.equal(input.value, "");
-    fireEvent.change(dialog.getByLabelText("Project workspace"), {
-      target: { value: host.root },
-    });
-    fireEvent.change(
-      dialog.getByLabelText("How many experts should participate?"),
-      { target: { value: "1" } },
+    // Direct convene skips the wizard dialog and opens the live council page immediately.
+    await eventually(
+      () => ui.getByRole("heading", { name: "Transit study", level: 1 }),
+      6000,
     );
-    fireEvent.click(dialog.getByText("Continue"));
-    const harness = await eventually(() => dialog.getByLabelText("Harness"));
-    await eventually(() => dialog.getByRole("option", {name: /^Codex · /}), 6000);
-    fireEvent.change(harness, { target: { value: "codex" } });
-    await eventually(() =>
-      dialog.getByRole("option", { name: /literal · Fast/ }),
-    );
-    fireEvent.change(dialog.getByLabelText("Model"), {
-      target: { value: "literal~fast" },
-    });
-    fireEvent.click(dialog.getByText("Continue"));
-    fireEvent.change(
-      await eventually(() => dialog.getByLabelText(/Which questions/)),
-      { target: { value: "Compare weekday service." } },
-    );
-    assert.equal(host.threads.size, 0);
-    fireEvent.click(
-      dialog.getByRole("button", { name: "Create and plan agenda" }),
-    );
+    assert.equal(ui.queryByRole("dialog"), null);
     await eventually(() => host.threads.size === 1, 8000);
     const request = host.routes("delegate/start")[0].body;
     assert.equal(request.harness, "codex");
-    assert.deepEqual(request.model, { id: "literal~fast" });
-    assert.match(String(request.task), /Compare weekday service/);
     assert.match(String(request.task), /Transit study/);
+    assert.match(String(request.task), /Compare weekday service/);
+
     host.finish(
       [...host.threads.keys()][0],
       JSON.stringify({
@@ -233,14 +213,33 @@ test("chat command selects a moderator, plans a topic via the backend, and waits
     const [card] = await rpc.call<Card[]>("topics/list");
     const tree = await until(
       () => rpc.call<Topic>("topics/get", { topicId: card.id }),
-      (t) => t.agendas.length === 1,
+      (t) =>
+        t.agendas.length === 1 &&
+        t.agendas[0].sub_agendas[0].dispatches.length === 1,
       10000,
     );
     assert.equal(tree.agendas[0].sub_agendas[0].title, "Weekday service");
-    assert.equal(tree.panelists.length, 1);
+    assert.equal(tree.panelists.length, 2);
     assert.equal(tree.moderator.provider, "codex");
-    assert.equal(host.threads.size, 1);
+    // 1 plan + 2 auto-dispatched opening panelists = 3 threads!
+    await eventually(() => host.threads.size === 3, 8000);
+
     fireEvent.click(ui.getByRole("button", { name: "Back to chat" }));
+    await eventually(() => !mounted());
+
+    // --custom opens the 1-screen Quick Convene dialog prefilled instead of auto-launching
+    input.value = "/althing --custom Custom topic";
+    fireEvent.input(input);
+    await eventually(() => hint()?.endsWith("Start a council"));
+    assert.equal(enter(), false);
+    const customSurface = await eventually(mounted);
+    const customUi = await eventually(() => query(customSurface));
+    const dialog = within(await eventually(() => customUi.getByRole("dialog")));
+    assert.equal(
+      (dialog.getByLabelText("Title") as HTMLTextAreaElement).value,
+      "Custom topic",
+    );
+    fireEvent.click(customUi.getByRole("button", { name: "Back to chat" }));
     await eventually(() => !mounted());
   } finally {
     dispose();

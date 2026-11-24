@@ -131,6 +131,17 @@ export function roundPrompt(
     .join("\n\n");
 }
 export function moderatorPrompt(kind: string, context: unknown) {
+  const autoAssign =
+    kind === "plan" &&
+    !!context &&
+    typeof context === "object" &&
+    "auto_assign_roles" in context &&
+    Boolean((context as { auto_assign_roles?: unknown }).auto_assign_roles);
+  const planBase =
+    "Return only one JSON object, without commentary or a code fence. Write titles, objectives, and framing in the same language as the topic. Its agendas field is a non-empty array of objects. Each agenda has a title (non-empty string), objective (string) and sub_agendas (array). Each sub-agenda has a title (non-empty string), prompt_framing (string) and execution_mode (parallel or sequential). You may give agendas and sub-agendas string IDs in id. Set depends_on only on sub-agendas, to a string[] of other sub-agenda IDs in this topic.";
+  const planExtra = autoAssign
+    ? " You may also include optional subtitle (concise framing string), domain_tags (up to 4 concise strings), and panelist_roles (array of { id, role } matching the existing roster IDs to tailor each seat's research role to this specific topic without changing seat count or harnesses)."
+    : "";
   const instructions: Record<string, string> = {
     synthesis:
       "Synthesize the evidence, consensus, minority positions and remaining uncertainty in Markdown.",
@@ -138,7 +149,7 @@ export function moderatorPrompt(kind: string, context: unknown) {
       "Return only one JSON object, without commentary or a code fence. Use conclusion_summary (a non-empty string), conclusion_key_points (string[]) and open_disagreements (string[]). Each array item must be a plain string, never a nested object. Include response IDs inline in those strings. Use [] when there are no items.",
     report:
       "Write a standalone Markdown report covering methods, evidence, implications, and uncertainty. Link each relevant agenda conclusion.",
-    plan: "Return only one JSON object, without commentary or a code fence. Its agendas field is a non-empty array of objects. Each agenda has a title (non-empty string), objective (string) and sub_agendas (array). Each sub-agenda has a title (non-empty string), prompt_framing (string) and execution_mode (parallel or sequential). You may give agendas and sub-agendas string IDs in id. Set depends_on only on sub-agendas, to a string[] of other sub-agenda IDs in this topic.",
+    plan: planBase + planExtra,
   };
   return [
     instructions[kind],

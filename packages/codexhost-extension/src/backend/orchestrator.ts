@@ -90,8 +90,17 @@ type State = {
   project_label: string;
   panelist_threads: Record<string, Config>;
   moderator_config?: Config;
+  auto_dispatch?: boolean;
+  auto_assign_roles?: boolean;
   runs: Run[];
 };
+function hasDiscussions(t: StoredTopic) {
+  return t.agendas.some((a) =>
+    a.sub_agendas.some(
+      (s) => s.dispatches.length > 0 || s.contributions.length > 0,
+    ),
+  );
+}
 function state(t: StoredTopic): State {
   const raw = input(t.metadata.codexhost ?? {});
   const s = {
@@ -633,6 +642,7 @@ export class Orchestrator {
               dispatches: s.dispatches.map(({ contributions, ...d }) => d),
             })),
         }));
+    const hostState = state(c.tree);
     const ctx = {
       topic: t.title,
       description: t.description,
@@ -642,9 +652,14 @@ export class Orchestrator {
         ...t.moderator,
         ...input(input(t.metadata.codexhost ?? {}).moderator_display ?? {}),
       },
+      ...(r.kind === "plan" &&
+      hostState.auto_assign_roles &&
+      !hasDiscussions(c.tree)
+        ? { auto_assign_roles: true }
+        : {}),
       agendas,
-      failed_slots: state(c.tree)
-        .runs.filter((r) => r.status === "failed" || r.status === "cancelled")
+      failed_slots: hostState.runs
+        .filter((r) => r.status === "failed" || r.status === "cancelled")
         .map((r) => ({ id: r.id, panelist: r.panelistId, error: r.error })),
     };
     return [r.task, moderatorPrompt(r.kind, ctx)].filter(Boolean).join("\n\n");
@@ -852,9 +867,10 @@ export class Orchestrator {
       }
     });
   }
-  private ingest(tid: string, rid: string, text: string) {
-    return this.edit(tid, rid, (c, r) => {
-      if (!live(r) || r.cancelRequested) return;
+  private async ingest(tid: string, rid: string, text: string) {
+    const autoDispatch = await this.edit(tid, rid, (c, r, s) => {
+      if (!live(r) || r.cancelRequested) return null;
+      let nextSub: { subAgendaId: string; locale: Locale } | null = null;
       if (r.kind === "panelist") {
         const { summary, key_points, stance_tags } = extract(text, r.kind);
         const con = c.create(
@@ -882,14 +898,60 @@ export class Orchestrator {
           current_activity: "",
         });
       else if (r.kind === "plan") {
+        const parsedPlan = structured(text, "agendas");
         const plan = z
           .array(z.record(z.unknown()))
           .min(1)
-          .safeParse(structured(text, "agendas")?.agendas);
+          .safeParse(parsedPlan?.agendas);
         if (!plan.success)
           throw Error(
             "The moderator plan must contain a non-empty agendas array of agenda objects.",
           );
+        if (s.auto_assign_roles && !hasDiscussions(c.tree) && parsedPlan) {
+          const patch: Record<string, unknown> = {};
+          if (Array.isArray(parsedPlan.panelist_roles)) {
+            const roleMap = new Map<string, string>();
+            for (const item of parsedPlan.panelist_roles) {
+              if (
+                item &&
+                typeof item === "object" &&
+                typeof (item as Record<string, unknown>).id === "string" &&
+                typeof (item as Record<string, unknown>).role === "string"
+              ) {
+                const role = ((item as Record<string, unknown>).role as string)
+                  .trim()
+                  .slice(0, 160);
+                if (role)
+                  roleMap.set((item as Record<string, unknown>).id as string, role);
+              }
+            }
+            if (roleMap.size) {
+              patch.panelists = c.tree.panelists.map((p) => ({
+                ...p,
+                role: roleMap.get(p.id) ?? p.role,
+              }));
+            }
+          }
+          if (
+            !c.tree.subtitle &&
+            typeof parsedPlan.subtitle === "string" &&
+            parsedPlan.subtitle.trim()
+          ) {
+            patch.subtitle = parsedPlan.subtitle.trim().slice(0, 400);
+          }
+          if (
+            !c.tree.domain_tags.length &&
+            Array.isArray(parsedPlan.domain_tags)
+          ) {
+            const tags = parsedPlan.domain_tags
+              .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+              .map((x) => x.trim().slice(0, 48))
+              .slice(0, 5);
+            if (tags.length) patch.domain_tags = tags;
+          }
+          if (Object.keys(patch).length) c.patch("topic", tid, patch);
+        }
+        s.auto_assign_roles = false;
         for (const [index, agenda] of plan.data.entries()) {
           try {
             c.create("agenda", agenda, tid, false);
@@ -903,6 +965,15 @@ export class Orchestrator {
         }
         validateDependencies(c.tree);
         c.rollup();
+        if (s.auto_dispatch && !r.cancelRequested && c.tree.panelists.length > 0) {
+          s.auto_dispatch = false;
+          const allSubs = c.tree.agendas.flatMap((a) => a.sub_agendas);
+          const first =
+            allSubs.find((sub) => sub.depends_on.length === 0) ?? allSubs[0];
+          if (first) {
+            nextSub = { subAgendaId: first.id, locale: r.locale ?? "en" };
+          }
+        }
       } else {
         let body = text,
           title = c.tree.title;
@@ -962,7 +1033,18 @@ export class Orchestrator {
       }
       update(c, r, { status: "completed", finishedAt: now() });
       if (r.kind === "panelist") progress(c, r.subAgendaId!);
+      return nextSub;
     });
+    if (autoDispatch && !this.disposed) {
+      try {
+        await this.dispatchRound(tid, autoDispatch.subAgendaId, {
+          round_type: "opening",
+          locale: autoDispatch.locale,
+        });
+      } catch {
+        // Keep the planned agendas intact even if auto-dispatch cannot start.
+      }
+    }
   }
   async cancel(tid: string, rid: string) {
     const r = await this.edit(tid, rid, (c, r) => {

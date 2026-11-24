@@ -32,10 +32,10 @@ For a manual install, download **`the-althing.zip`** from the latest stable rele
 /althing Which transit corridor should we pilot after the last bus?
 ```
 
-1. Enter the command in a Desktop or Web chat and press Enter, or choose **Start a council**. A bare `/althing` opens the same wizard with an empty title.
-2. Choose the workspace and number of experts. **Add collaboration experts** uses the ready agents and their defaults from CodexHost. For each seat, choose its agent, model, thinking level and role. The first expert can chair the meeting, or you can select another moderator.
-3. Use **Create and plan agenda** to have the chair propose sub-agendas. Review the plan, open a sub-agenda and select **Dispatch round** when you are ready for the experts to speak.
-4. Read the opening statements, request a critique, then select **Synthesize**. Publish an agenda report or a final report. In an unarchived council, **Expert roster → Configure roles & agents** changes assignments for subsequent rounds.
+1. Enter `/althing <topic>` (single-line or multi-line) in Desktop or Web chat and press **Enter** or click **Send** — just like `/goal`, it dispatches straight to The Althing with zero modal forms. (Press `Tab` on `/alt` to autocomplete.)
+2. The Althing automatically detects your active project workspace, selects an optimal panel size and diverse ready CodexHost agents (using your Host collaboration defaults), assigns complementary topic-aware roles, and asks the chair to plan agendas and refine roles.
+3. Once planning finishes, the opening round starts automatically. Watch live progress on the Kickoff Card, click **Pause auto-dispatch** if you want to edit agendas first, or click **Configure roles & agents** anytime to tweak seats.
+4. For manual control up front, run bare `/althing`, `/althing --custom <topic>`, or click **+ New Council** to open the 1-screen Quick Convene modal (or use optional flags `--debate`, `--rapid`, `--experts 4`).
 
 <a id="features"></a>
 
@@ -43,12 +43,12 @@ For a manual install, download **`the-althing.zip`** from the latest stable rele
 
 | Feature | What you can do |
 | --- | --- |
-| `/althing` | Open the meeting wizard from chat, optionally with a topic already filled in. |
-| Multi-agent collaboration & role assignment | See which host agents are ready. Use the host defaults or choose each expert’s and moderator’s model, reasoning level and role. |
+| Direct `/althing` command | Send `/althing <topic>` (single- or multi-line) straight from chat like `/goal` to convene immediately — no 3-step wizard required. Supports `Tab` completion and optional `--debate`, `--rapid`, `--experts N`, `--custom` flags. |
+| Smart seat, role & count allocation | Automatically chooses optimal panel size, diverse ready Host agents, defaults, and domain-tailored roles (further refined by the chair during planning), plus full manual control anytime. |
+| Auto-kickoff & live progress | Plans agendas and automatically dispatches Round 1 (toggleable in plugin settings or per-council Kickoff Card), tracks delegated threads, and lets you cancel or retry any run. |
 | Discussion protocols | Run a standard council, adversarial debate or rapid panel. Dispatch in parallel or in sequence and target a particular contribution for rebuttal. |
-| Progress & delegated threads | Follow each seat’s progress, inspect the delegated thread, cancel a running task or retry a failed one. |
 | Reports & portable ZIP archives | Read and print reports, download HTML or Markdown, and move the whole council to another host in a ZIP. |
-| Desktop, Web & Mobile | Find councils under their Desktop projects or open the Web panel. Narrow screens show conclusion cards and horizontally scrollable tables. |
+| Desktop, Web & Mobile | Find councils under their Desktop projects, use the Hub inline Quick Convene bar, or open the Web panel. Narrow screens show conclusion cards and horizontally scrollable tables. |
 | Interface languages | English, Simplified Chinese, Traditional Chinese, Japanese and Korean. The default follows CodexHost and falls back to English. Override it under **Interface language** in plugin settings. |
 
 <a id="screenshots"></a>

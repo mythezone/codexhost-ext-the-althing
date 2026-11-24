@@ -45,3 +45,23 @@ legend {font-weight:750;padding-inline:5px}
 .agent-directory h3 {margin:0}
 .agent-directory button {text-align:start;overflow-wrap:anywhere}
 .agent-fields select {width:100%;text-overflow:ellipsis}
+.quick-convene {display:flex;align-items:center;gap:8px;margin-block:10px 14px;width:100%;min-width:0}
+.quick-convene input {flex:1 1 220px;min-width:0;min-height:42px;padding:8px 12px;border:1.4px solid var(--ink);border-radius:9px;background:var(--card);color:var(--ink)}
+.quick-convene button {min-height:42px;white-space:nowrap}
+.smart-preview {border:1px solid var(--line);border-radius:10px;padding:12px;margin-block:10px;background:var(--wash);min-width:0}
+.smart-preview-head {display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.seat-chips {display:flex;flex-wrap:wrap;gap:6px;margin-block:6px}
+.seat-chip {display:inline-flex;align-items:baseline;flex-wrap:wrap;gap:4px 6px;max-width:100%;padding:4px 9px;border-radius:8px;border:1px solid var(--line);background:var(--card);font-size:.84rem;overflow-wrap:anywhere}
+.seat-chip small {color:var(--muted)}
+.customize-drawer {margin-top:10px}
+.kickoff-card {border-left:5px solid var(--primary)}
+.kickoff-steps {display:flex;flex-wrap:wrap;gap:6px 14px;list-style:none;padding:0;margin:10px 0;font-size:.88rem}
+.kickoff-steps li {display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:7px;background:var(--wash)}
+.kickoff-steps li[data-state="done"] {background:var(--done-fill);color:var(--blue-ink);font-weight:700}
+.kickoff-steps li[data-state="active"] {background:var(--live-fill);color:var(--blue-ink);font-weight:700}
+.kickoff-steps li[data-state="paused"] {background:var(--peach);color:var(--blue-ink)}
+@media (max-width:590px) {
+  .quick-convene {flex-wrap:wrap}
+  .quick-convene input {flex:1 1 100%}
+  .quick-convene button {width:100%}
+}

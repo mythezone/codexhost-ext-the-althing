@@ -76,7 +76,9 @@ function App({
   );
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
+    [convening, setConvening] = useState(false),
     lock = useRef(false),
+    conveneSeq = useRef(0),
     [version, refresh] = useReducer((n: number) => n + 1, 0);
   const locale = resolveLocale(hostLocale, settings.language);
   useLayoutEffect(() => {
@@ -104,6 +106,83 @@ function App({
     },
     [cache],
   );
+  useEffect(() => {
+    if (!dest.convenePrompt || !settingsReady) return;
+    const prompt = dest.convenePrompt;
+    const seq = ++conveneSeq.current;
+    let live = true;
+    setConvening(true);
+    setError("");
+    void rpc
+      .call<{ topic: Topic }>("council/convene", {
+        prompt,
+        ...(dest.projectCwd || cwd ? { cwd: dest.projectCwd || cwd } : {}),
+        ...(dest.conveneProtocol ? { protocol: dest.conveneProtocol } : {}),
+        ...(dest.conveneExpertCount
+          ? { expertCount: dest.conveneExpertCount }
+          : {}),
+        autoDispatch: settings.autoStartCouncil !== false,
+      })
+      .then((res) => {
+        if (!live || conveneSeq.current !== seq) return;
+        const host = res.topic.metadata.codexhost as
+          | { runs?: Run[]; project_cwd?: string }
+          | undefined;
+        const nextSnap: Snapshot = {
+          topic: res.topic,
+          runs: Array.isArray(host?.runs) ? host.runs : [],
+          version: version + 1,
+        };
+        cache.set(res.topic.id, nextSnap);
+        setSnapshot(nextSnap);
+        setConvening(false);
+        refresh();
+        navigate({
+          topicId: res.topic.id,
+          projectCwd: host?.project_cwd || dest.projectCwd || cwd,
+        });
+      })
+      .catch((e) => {
+        if (!live || conveneSeq.current !== seq || rpc.signal?.aborted) return;
+        setConvening(false);
+        const msg = (e as Error).message || "";
+        const friendly = msg.includes("NO_WORKSPACE")
+          ? l(
+              "Choose a project workspace to convene this council.",
+              "请选择一个项目工作区以召开此议会。",
+            )
+          : msg.includes("NO_READY_AGENTS")
+            ? l(
+                "No ready CodexHost agents were found. Configure seats below or check your Host agent setup.",
+                "未发现就绪的 CodexHost Agent，请在下方手动配置或在宿主中检查 Agent 状态。",
+              )
+            : msg;
+        go({
+          newCouncil: true,
+          commandTopic: prompt,
+          conveneProtocol: dest.conveneProtocol,
+          conveneExpertCount: dest.conveneExpertCount,
+          customSetup: true,
+          projectCwd: dest.projectCwd || cwd,
+        });
+        show(true);
+        setError(friendly);
+      });
+    return () => {
+      live = false;
+    };
+  }, [
+    dest.convenePrompt,
+    dest.projectCwd,
+    dest.conveneProtocol,
+    dest.conveneExpertCount,
+    settingsReady,
+    settings.autoStartCouncil,
+    rpc,
+    cache,
+    navigate,
+    l,
+  ]);
   useEffect(() => {
     const onNav = (e: Event) =>
       navigate((e as CustomEvent<Destination>).detail);
@@ -383,7 +462,24 @@ function App({
                 </button>
               </aside>
             )}
-            {dest.topicId ? (
+            {convening ? (
+              <main className="topic-body" aria-busy="true">
+                <section
+                  className="panel kickoff-card"
+                  role="status"
+                  aria-label={l("Convening council…", "正在召开议会…")}
+                >
+                  <h2>{l("Convening council…", "正在召开议会…")}</h2>
+                  <p>{dest.convenePrompt}</p>
+                  <p className="small">
+                    {l(
+                      "Assigning ready experts, tailoring roles, and preparing the agenda…",
+                      "正在智能分配就绪专家、匹配角色并筹备议程…",
+                    )}
+                  </p>
+                </section>
+              </main>
+            ) : dest.topicId ? (
               topic ? (
                 <TopicPage key={topic.id} topic={topic} initial={dest} />
               ) : (
@@ -427,14 +523,23 @@ function App({
                 prefetch={(id) => {
                   void loadTopic(id).catch(() => {});
                 }}
+                convene={(prompt) =>
+                  navigate({
+                    convenePrompt: prompt,
+                    projectCwd: cwd || undefined,
+                  })
+                }
                 create={() => show(true)}
               />
             )}
             {wizard && settingsReady && (
               <Wizard
-                key={dest.commandTopic}
+                key={(dest.commandTopic ?? "") + (dest.customSetup ? ":c" : "")}
                 cwd={cwd}
                 commandTopic={dest.newCouncil ? dest.commandTopic : undefined}
+                initialProtocol={dest.conveneProtocol}
+                initialExpertCount={dest.conveneExpertCount}
+                initialCustom={!!dest.customSetup}
                 close={() => {
                   show(false);
                   if (dest.newCouncil) go({ projectCwd: cwd });

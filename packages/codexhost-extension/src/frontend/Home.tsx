@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Plus, Search, Upload } from "lucide-react";
+import { ArrowRight, Plus, Search, Sparkles, Upload } from "lucide-react";
 import { useAssets, useL, useWorkspace } from "./context";
 import type { Card } from "./types";
 import { workspaceKey, activeCouncil } from "./host";
@@ -8,12 +8,14 @@ export function Home({
   cards,
   cwd,
   setCwd,
+  convene,
   create,
   prefetch,
 }: {
   cards: Card[];
   cwd: string;
   setCwd: (s: string) => void;
+  convene: (prompt: string) => void;
   create: () => void;
   prefetch: (id: string) => void;
 }) {
@@ -22,6 +24,7 @@ export function Home({
     { projects, rpc, perform, navigate, busy } = useWorkspace(),
     file = useRef<HTMLInputElement>(null);
   const [q, search] = useState(""),
+    [quickPrompt, setQuickPrompt] = useState(""),
     [filter, choose] = useState("all");
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const stopPrefetch = () => clearTimeout(timer.current);
@@ -67,6 +70,34 @@ export function Home({
           ))}
         </div>
       </section>
+      <form
+        className="quick-convene"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const text = quickPrompt.trim();
+          if (!text) return;
+          setQuickPrompt("");
+          convene(text);
+        }}
+      >
+        <input
+          aria-label={l("Quick convene topic", "快速开会议题")}
+          placeholder={l(
+            "Ask a question to convene a council instantly…",
+            "输入问题，回车直接智能召开议会…",
+          )}
+          value={quickPrompt}
+          onChange={(e) => setQuickPrompt(e.target.value)}
+        />
+        <button
+          className="primary"
+          type="submit"
+          disabled={busy || !quickPrompt.trim()}
+        >
+          <Sparkles size={16} />
+          {l("Convene", "立即开会")}
+        </button>
+      </form>
       <div className="tools hub-tools">
         <select
           aria-label={l("Project filter", "项目筛选")}

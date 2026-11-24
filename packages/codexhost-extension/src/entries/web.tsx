@@ -38,13 +38,33 @@ export async function activate(
     },
   });
   let closeCommand: (() => void) | undefined;
+  let commandContainer: HTMLElement | undefined;
   let hostLocale = api.locale || "en",
     preference: unknown = "auto";
   const offCommand =
     api.dom &&
     installCouncilCommand(
-      (commandTopic) => {
-        if (closeCommand) return;
+      (cmd) => {
+        const initial =
+          cmd.prompt && !cmd.custom
+            ? {
+                convenePrompt: cmd.prompt,
+                conveneProtocol: cmd.protocol,
+                conveneExpertCount: cmd.expertCount,
+              }
+            : {
+                newCouncil: true,
+                commandTopic: cmd.prompt,
+                conveneProtocol: cmd.protocol,
+                conveneExpertCount: cmd.expertCount,
+                customSetup: cmd.custom,
+              };
+        if (closeCommand && commandContainer) {
+          commandContainer.dispatchEvent(
+            new CustomEvent("althing:navigate", { detail: initial }),
+          );
+          return;
+        }
         const mount = api.dom!.mount(document.body);
         if (!mount) return;
         mount.container.dataset.althingWebWorkspace = "";
@@ -52,18 +72,20 @@ export async function activate(
           unmount();
           mount.dispose();
           closeCommand = undefined;
+          commandContainer = undefined;
         };
         const unmount = mountWorkspace(mount.container, api, {
-          initial: { newCouncil: true, commandTopic },
+          initial,
           close,
         });
         closeCommand = close;
+        commandContainer = mount.container;
       },
-      () =>
+      (instant) =>
         translate(
           resolveLocale(hostLocale, preference),
-          "Start a council",
-          "发起会议",
+          instant ? "Press Enter to convene council" : "Start a council",
+          instant ? "回车直接召开议会" : "发起会议",
         ),
     );
   const offAppearance =
