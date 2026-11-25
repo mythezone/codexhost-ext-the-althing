@@ -42,8 +42,15 @@ test("parseCouncilCommand handles single-line, multi-line, flags, bare command, 
   assert.equal(parseCouncilCommand("explain /althing command"), null);
 
   assert.equal(isCouncilCommandPrefix("/alt"), true);
+  assert.equal(isCouncilCommandPrefix("／alt"), true);
   assert.equal(isCouncilCommandPrefix("/althing"), true);
   assert.equal(isCouncilCommandPrefix("/althing hi"), false);
+
+  assert.deepEqual(parseCouncilCommand("／althing 中文议题"), {
+    raw: "／althing 中文议题",
+    prompt: "中文议题",
+    custom: false,
+  });
 
   assert.deepEqual(parseCouncilCommand("/althing"), {
     raw: "/althing",

@@ -152,8 +152,9 @@ test("chat command directly convenes a council with smart allocation, Tab autoco
     input.value = "/alt";
     fireEvent.input(input);
     const hint = () =>
-      shell.querySelector("[data-althing-command]")?.textContent;
+      document.querySelector("[data-althing-command]")?.textContent;
     await eventually(() => hint()?.endsWith("Start a council"));
+    assert.equal(shell.querySelector("[data-althing-command]"), null);
     assert.equal(fireEvent.keyDown(input, { key: "Tab" }), false);
     assert.equal(input.value, "/althing ");
 

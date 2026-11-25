@@ -11,12 +11,12 @@ export type ParsedCouncilCommand = {
   expertCount?: number;
 };
 
-const leadingCommand = /^\s*\/althing(?=$|[\s\u00A0])([\s\S]*)$/i;
+const leadingCommand = /^\s*[/／]althing(?=$|[\s\u00A0])([\s\S]*)$/i;
 const flagToken =
   /^--(debate|adversarial|rapid|quick|standard|custom|manual|experts)(?:=(\d+))?(?=$|[\s\u00A0])([\s\S]*)$/i;
 
 export function isCouncilCommandPrefix(text: string): boolean {
-  const trimmed = text.trim().toLowerCase();
+  const trimmed = text.trim().replace(/^／/, "/").toLowerCase();
   return (
     trimmed.length > 0 &&
     trimmed.startsWith("/") &&

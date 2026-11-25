@@ -792,3 +792,196 @@ for (const engine of [chromium, webkit]) {
     },
   );
 }
+
+test("chromium embedded Codex Desktop (26.1120): sidebar placement below New chat & Bot, project councils, and ProseMirror /althing floating pill", async (t) => {
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const page = await browser.newPage({
+    viewport: { width: 1280, height: 800 },
+  });
+  const desktopJs = await readFile("dist/desktop/index.js", "utf8");
+  const desktopCss = await readFile("dist/desktop/style.css", "utf8");
+  const { api } = mockUI();
+  await page.exposeFunction("invoke", async (method: string, params: any) => {
+    if (method === "althing/codexhost/projects") {
+      return {
+        projects: [{ cwd: "/projects/study", name: "Study" }],
+        total: 1,
+        nextOffset: null,
+      };
+    }
+    if (method === "althing/codexhost/threads") {
+      return {
+        threads: [
+          { thread: "codex://threads/thread-study-1", cwd: "/projects/study" },
+        ],
+      };
+    }
+    return api.backend.invoke(method, params);
+  });
+  await page.exposeFunction("readDataUrl", async () =>
+    api.assets.readDataUrl!(),
+  );
+  await page.setContent(`<!doctype html>
+    <html lang="zh-CN">
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          body { margin: 0; display: flex; height: 100vh; font: 14px/1.4 system-ui, sans-serif; }
+          aside { width: 260px; flex: none; display: flex; flex-direction: column; padding: 10px; box-sizing: border-box; border-right: 1px solid #ddd; }
+          .top-nav { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+          .top-nav > button { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 6px 10px; border: 0; border-radius: 8px; background: transparent; text-align: start; font: inherit; }
+          [data-app-action-sidebar-scroll] { flex: 1; overflow: auto; }
+          main { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; padding: 24px; }
+          [data-codex-composer-root] { border: 1px solid #ccc; border-radius: 14px; padding: 12px; overflow: hidden; display: flex; align-items: center; gap: 8px; }
+          .ProseMirror { flex: 1; min-height: 24px; outline: none; }
+        </style>
+        <style>${desktopCss}</style>
+      </head>
+      <body>
+        <aside>
+          <div class="top-nav">
+            <button id="nav-new" type="button"><svg width="16" height="16"></svg><span>新聊天</span></button>
+            <button id="nav-bot" type="button"><svg width="16" height="16"></svg><span>Bot</span></button>
+          </div>
+          <div data-app-action-sidebar-scroll>
+            <section id="pinned-sec">
+              <div>置顶</div>
+              <div role="list">
+                <div role="listitem">
+                  <div id="pinned-row" data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="local:thread-study-1">
+                    <span data-thread-title>置顶会话</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <section id="proj-study">
+              <div id="study-bar" style="display:flex;align-items:center;justify-content:space-between;">
+                <div id="study-header" data-sidebar-cycle-item role="button" aria-expanded="true">
+                  <svg width="14" height="14"></svg><span>Study</span>
+                </div>
+                <button type="button" aria-label="新建">+</button>
+              </div>
+              <div role="list">
+                <div role="listitem">
+                  <div id="study-row" data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="local:thread-study-1">
+                    <span data-thread-title>项目会话</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </aside>
+        <main>
+          <div data-above-composer-conversation-id="thread-study-1"></div>
+          <div data-codex-composer-root>
+            <div class="ProseMirror" contenteditable="true" role="textbox"><p><br class="ProseMirror-trailingBreak"></p></div>
+            <button type="submit" aria-label="发送">发送</button>
+          </div>
+        </main>
+      </body>
+    </html>`);
+
+  await page.addScriptTag({
+    content: `
+      window.__hostSawEnter = false;
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") window.__hostSawEnter = true;
+      }, true);
+      var __def;
+      (function (define) { ${desktopJs}\n })(function (d) { __def = d; });
+      var __ctrl = new AbortController();
+      __def.activate({
+        signal: __ctrl.signal,
+        backend: { invoke: function (m, p) { return window.invoke(m, p); } },
+        assets: { readDataUrl: function () { return window.readDataUrl(); } },
+        storage: { get: async function () { return {}; }, onChange: function () { return function () {}; } },
+        dom: {
+          mount: function (el, parent, pos) {
+            parent[pos || "append"](el);
+          }
+        },
+        sidebar: {
+          observeRows: function (cb) {
+            cb([
+              { element: document.querySelector("#pinned-row"), threadId: "thread-study-1", isLocal: true },
+              { element: document.querySelector("#study-row"), threadId: "thread-study-1", isLocal: true }
+            ]);
+            return function () {};
+          }
+        },
+        navigate: { openThread: async function () {} },
+        track: function () {}
+      });
+    `,
+  });
+
+  // Verify top entry sits below 新聊天 & Bot and strictly above 置顶.
+  const topBtn = page.locator('[data-althing-owned="top"]');
+  await topBtn.waitFor();
+  const geometry = await page.evaluate(() => {
+    const newRect = document.querySelector("#nav-new")!.getBoundingClientRect();
+    const botRect = document.querySelector("#nav-bot")!.getBoundingClientRect();
+    const topRect = document
+      .querySelector('[data-althing-owned="top"]')!
+      .getBoundingClientRect();
+    const pinnedRect = document
+      .querySelector("#pinned-sec")!
+      .getBoundingClientRect();
+    const studyBarRect = document
+      .querySelector("#study-bar")!
+      .getBoundingClientRect();
+    const groupRect = document
+      .querySelector('#proj-study [data-althing-owned="group"]')!
+      .getBoundingClientRect();
+    const pinnedGroup = document.querySelector(
+      '#pinned-sec [data-althing-owned="group"]',
+    );
+    return {
+      newBottom: newRect.bottom,
+      botBottom: botRect.bottom,
+      topTop: topRect.top,
+      topBottom: topRect.bottom,
+      pinnedTop: pinnedRect.top,
+      studyBarBottom: studyBarRect.bottom,
+      groupTop: groupRect.top,
+      hasPinnedGroup: Boolean(pinnedGroup),
+    };
+  });
+  assert.ok(geometry.topTop >= geometry.botBottom - 1);
+  assert.ok(geometry.topBottom <= geometry.pinnedTop + 1);
+  assert.equal(geometry.hasPinnedGroup, false);
+  assert.ok(geometry.groupTop >= geometry.studyBarBottom - 1);
+
+  // Verify ProseMirror /althing floating pill sits cleanly above composer (outside composer root)
+  // and real Chromium click + Enter both work and clear ProseMirror cleanly.
+  const pm = page.locator(".ProseMirror");
+  await pm.click();
+  await page.keyboard.type("/althing 实测浏览器议会");
+  const pill = page.locator("[data-althing-command]");
+  await pill.waitFor();
+  const pillInfo = await page.evaluate(() => {
+    const composer = document.querySelector("[data-codex-composer-root]")!;
+    const p = document.querySelector("[data-althing-command]")!;
+    const cRect = composer.getBoundingClientRect();
+    const pRect = p.getBoundingClientRect();
+    return {
+      insideComposer: composer.contains(p),
+      aboveComposer: pRect.bottom <= cRect.top + 1,
+      visibleInViewport: pRect.top >= 0 && pRect.left >= 0 && pRect.width > 40,
+    };
+  });
+  assert.equal(pillInfo.insideComposer, false);
+  assert.equal(pillInfo.aboveComposer, true);
+  assert.equal(pillInfo.visibleInViewport, true);
+
+  await page.keyboard.press("Enter");
+  const overlay = page.locator('[data-althing-owned="overlay"]');
+  await overlay.waitFor();
+  await overlay.getByRole("heading", { name: "实测浏览器议会", level: 1 }).waitFor();
+  assert.equal(await page.evaluate(() => (window as any).__hostSawEnter), false);
+  assert.equal((await pm.innerText()).trim(), "");
+  // Clicking native "新聊天" yields the overlay cleanly.
+  await page.locator("#nav-new").click();
+  await overlay.waitFor({ state: "detached" });
+});

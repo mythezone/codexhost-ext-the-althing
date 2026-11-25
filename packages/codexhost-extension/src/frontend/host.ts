@@ -60,22 +60,26 @@ export function listenAppearance(
   let locale = reportedLocale.get(api) ?? api.locale,
     scheme = api.colorScheme;
   const apply = () => {
+    const themeAttr = html.getAttribute("data-theme");
     const cssScheme = doc.defaultView?.getComputedStyle(doc.body).colorScheme;
-    const native = html.classList.contains("dark")
-      ? "dark"
-      : html.classList.contains("light")
-        ? "light"
-        : cssScheme === "light" || cssScheme === "dark"
-          ? cssScheme
-          : media?.matches
-            ? "dark"
-            : "light";
+    const native =
+      themeAttr === "dark" || themeAttr === "light"
+        ? themeAttr
+        : html.classList.contains("dark")
+          ? "dark"
+          : html.classList.contains("light")
+            ? "light"
+            : cssScheme === "light" || cssScheme === "dark"
+              ? cssScheme
+              : media?.matches
+                ? "dark"
+                : "light";
     update(locale || html.lang || "en", scheme || native);
   };
   const obs = new MutationObserver(apply);
   obs.observe(html, {
     attributes: true,
-    attributeFilter: ["lang", "class", "style"],
+    attributeFilter: ["lang", "class", "style", "data-theme"],
   });
   media?.addEventListener("change", apply);
   const offLocale = api.onLocaleChange?.((s) => {

@@ -61,7 +61,7 @@ test("Desktop classic entry coexists with thread tree, tracks geometry, yields t
       mount: (
         e: Element,
         p: Element,
-        key: "prepend" | "append" | "after" = "append",
+        key: "prepend" | "append" | "before" | "after" = "append",
       ) => p[key](e),
     },
     sidebar: {
@@ -95,13 +95,23 @@ test("Desktop classic entry coexists with thread tree, tracks geometry, yields t
     assert.equal(top.style.fontSize, "12px");
     assert.equal(owned("group")?.style.fontSize, "12px");
     assert.equal(document.querySelector("#empty [data-althing-owned]"), null);
+    // Default visibility is now "always": top entry stays visible even with 0 active councils.
     update([{ ...cards[0], status: "completed", activeRunCount: 0 }]);
+    await eventually(() => owned("top")?.querySelector("small")?.hidden && owned("group"));
+    // Legacy sidebarAlthingVisibility: "active" upgrades to always-visible; "hidden" still hides.
+    for (const cb of h.listeners) cb({ sidebarAlthingVisibility: "active" });
+    await eventually(() => owned("top"));
+    for (const cb of h.listeners) cb({ sidebarAlthingVisibility: "hidden" });
+    await eventually(() => !owned("top"));
+    // Explicit sidebarEntryVisibility controls always / active / hidden.
+    for (const cb of h.listeners) cb({ sidebarEntryVisibility: "active" });
     await eventually(() => !owned("top") && owned("group"));
-    for (const cb of h.listeners) cb({ sidebarAlthingVisibility: "always" });
-    await eventually(() => owned("top")?.querySelector("small")?.hidden);
+    update([{ ...cards[0], status: "in_progress", activeRunCount: 0 }]);
+    await eventually(() => owned("top"));
+    for (const cb of h.listeners) cb({ sidebarEntryVisibility: "always" });
     update([]);
     await eventually(() => !owned("group") && owned("top"));
-    for (const cb of h.listeners) cb({ sidebarAlthingVisibility: "hidden" });
+    for (const cb of h.listeners) cb({ sidebarEntryVisibility: "hidden" });
     update([{ ...cards[0], status: "in_progress", activeRunCount: 0 }]);
     await eventually(() => !owned("top") && owned("group"));
     for (const cb of h.listeners) cb({});
@@ -115,7 +125,8 @@ test("Desktop classic entry coexists with thread tree, tracks geometry, yields t
     prompt.value = "/althing Desktop meeting";
     fireEvent.input(prompt);
     const hint = () =>
-      composer.querySelector("[data-althing-command]")?.textContent;
+      document.querySelector("[data-althing-command]")?.textContent;
+    assert.equal(composer.querySelector("[data-althing-command]"), null);
     for (const [language, title, command] of [
       ["zh-CN", "议事厅", "回车直接召开议会"],
       ["zh-HK", "議事廳", "Enter 直接召開議會"],
@@ -239,4 +250,259 @@ test("Desktop classic entry coexists with thread tree, tracks geometry, yields t
   assert.equal(subs + h.listeners.size, 0);
   assert.equal(document.querySelector("[data-althing-owned]"), null);
   assert.equal(foreign.outerHTML, before);
+});
+
+test("Embedded Codex Desktop (26.1120): top entry sits below New chat & Bot above Pinned, projects match collapsed/flex headers, and ProseMirror /althing beats host keydown", async (t) => {
+  dom(t);
+  document.documentElement.lang = "zh-CN";
+  const h = mockUI();
+  const original = h.api.backend.invoke.bind(h.api.backend);
+  const baseCards = (await original(
+    "althing/topics/list",
+  )) as import("../src/frontend/types").Card[];
+  const items: typeof baseCards = [
+    {
+      ...baseCards[0],
+      id: "council-althing",
+      title: "Althing Plugin Arch",
+      status: "completed",
+      activeRunCount: 0,
+      projectCwd: "/work/the-althing/packages",
+      projectLabel: "packages",
+    },
+    {
+      ...baseCards[0],
+      id: "council-study",
+      title: "Collapsed Study Council",
+      status: "draft",
+      activeRunCount: 0,
+      projectCwd: "/projects/study",
+      projectLabel: "Study",
+    },
+  ];
+  let lastConveneParams: any = null;
+  const backend = {
+    invoke: async (method: string, p: any) => {
+      if (method === "althing/topics/list") return items;
+      if (method === "althing/codexhost/projects") {
+        return {
+          projects: [
+            { cwd: "/work/the-althing", name: "the-althing" },
+            { cwd: "/projects/study", name: "Study" },
+          ],
+          total: 2,
+          nextOffset: null,
+        };
+      }
+      if (method === "althing/codexhost/threads") {
+        return {
+          threads: [
+            {
+              thread: "codex://threads/pinned-uuid-1",
+              cwd: "/work/the-althing",
+            },
+            {
+              threadId: "local:proj-uuid-2",
+              cwd: "/work/the-althing",
+            },
+          ],
+        };
+      }
+      if (method === "althing/council/convene") {
+        lastConveneParams = p;
+      }
+      if (method === "althing/events/since")
+        return { cursor: 0, events: [], activeRunCount: 0 };
+      return original(method, p);
+    },
+  };
+
+  // Simulate Codex Desktop 26.1120 Chinese sidebar DOM:
+  // Top nav ("新聊天", "Bot", "技能") above scroll area, then "置顶" (Pinned),
+  // then an expanded project with a horizontal flex header bar + SVG icon + "+" button,
+  // then a collapsed project with [data-sidebar-cycle-item] + leading <svg> and no rows.
+  document.body.innerHTML = `
+    <aside>
+      <div class="top-nav">
+        <button id="nav-new" type="button"><svg></svg><span>新聊天</span></button>
+        <button id="nav-bot" type="button" style="font-size: 14px; min-height: 32px; border-radius: 8px;"><svg></svg><span>Bot</span></button>
+        <button id="nav-skills" type="button"><svg></svg><span>技能</span></button>
+      </div>
+      <div data-app-action-sidebar-scroll>
+        <section id="pinned-sec">
+          <div class="section-header">置顶</div>
+          <div role="list">
+            <div role="listitem">
+              <div id="pinned-row" data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="local:pinned-uuid-1">
+                <span data-thread-title>Pinned thread</span>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section id="project-althing">
+          <div id="althing-header-bar" style="display: flex; flex-direction: row;">
+            <div id="althing-header" data-sidebar-cycle-item role="button" aria-expanded="true">
+              <svg></svg><span>the-althing</span>
+            </div>
+            <button type="button" aria-label="New thread">+</button>
+          </div>
+          <div role="list">
+            <div role="listitem">
+              <div id="althing-row" data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="local:proj-uuid-2">
+                <span data-thread-title>Project thread</span>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section id="project-study">
+          <div id="study-header" data-sidebar-cycle-item role="button" aria-expanded="false">
+            <svg></svg><span>Study</span>
+          </div>
+        </section>
+      </div>
+    </aside>
+    <main>
+      <div data-above-composer-conversation-id="proj-uuid-2"></div>
+      <div data-codex-composer-root>
+        <div class="ProseMirror" contenteditable="true" role="textbox"><p><span contenteditable="false" class="pm-widget"></span></p></div>
+        <button type="submit" aria-label="发送"></button>
+      </div>
+    </main>
+  `;
+
+  const code = await readFile(
+    new URL("../dist/desktop/index.js", import.meta.url),
+    "utf8",
+  );
+  let definition: any;
+  new Script("(function(define){" + code + "\n})").runInThisContext()(
+    (d: any) => {
+      definition = d;
+    },
+  );
+  const { locale, onLocaleChange, ...desktopApi } = h.api;
+  const dispose = definition.activate({
+    ...desktopApi,
+    backend,
+    assets: { readDataUrl: h.api.assets.readDataUrl },
+    dom: {
+      mount: (
+        e: Element,
+        p: Element,
+        key: "prepend" | "append" | "before" | "after" = "append",
+      ) => p[key](e),
+    },
+    sidebar: {
+      observeRows: (fn: Function) => {
+        fn([
+          {
+            threadId: "pinned-uuid-1",
+            isLocal: true,
+            element: document.querySelector("#pinned-row"),
+          },
+          {
+            threadId: "proj-uuid-2",
+            isLocal: true,
+            element: document.querySelector("#althing-row"),
+          },
+        ]);
+        return () => {};
+      },
+    },
+    navigate: { openThread: async () => {} },
+    track: () => {},
+  });
+
+  const owned = (k: string) =>
+    document.querySelector<HTMLElement>('[data-althing-owned="' + k + '"]');
+  let hostDocumentKeydownSawSlash = false;
+  const hostKeydownProbe = (e: KeyboardEvent) => {
+    if (e.key === "Enter") hostDocumentKeydownSawSlash = true;
+  };
+  document.addEventListener("keydown", hostKeydownProbe, true);
+
+  try {
+    // 1. Top "议事厅" entry is visible by default (even with 0 active runs) and placed
+    //    strictly AFTER "Bot" (below "新聊天" & "Bot") and ABOVE "置顶".
+    const top = await eventually(() => owned("top"));
+    assert.equal(top.textContent?.trim(), "议事厅");
+    const navBot = document.querySelector("#nav-bot")!;
+    const navSkills = document.querySelector("#nav-skills")!;
+    assert.equal(navBot.nextElementSibling, top);
+    assert.equal(top.nextElementSibling, navSkills);
+    assert.equal(top.style.fontSize, "14px");
+
+    // 2. Pinned section NEVER receives a project council group.
+    assert.equal(
+      document.querySelector('#pinned-sec [data-althing-owned="group"]'),
+      null,
+    );
+
+    // 3. Expanded project "the-althing" receives its subdirectory council (/work/the-althing/packages)
+    //    mounted vertically AFTER its horizontal flex header bar (not crushed inside it).
+    const althingGroup = await eventually(() =>
+      document.querySelector<HTMLElement>(
+        '#project-althing [data-althing-owned="group"]',
+      ),
+    );
+    assert.equal(
+      document.querySelector("#althing-header-bar")!.nextElementSibling,
+      althingGroup,
+    );
+    assert.match(althingGroup.textContent!, /议事厅 · 1/);
+
+    // 4. Collapsed project "Study" (leading <svg>, no rows) ALSO receives its council group!
+    const studyGroup = await eventually(() =>
+      document.querySelector<HTMLElement>(
+        '#project-study [data-althing-owned="group"]',
+      ),
+    );
+    assert.equal(
+      document.querySelector("#study-header")!.nextElementSibling,
+      studyGroup,
+    );
+    assert.match(studyGroup.textContent!, /议事厅 · 1/);
+
+    // 5. Clicking top "议事厅" opens overlay & marks aria-current="page"; clicking "新聊天" or "Bot" yields.
+    fireEvent.click(top);
+    await eventually(() => owned("overlay"));
+    assert.equal(top.getAttribute("aria-current"), "page");
+    fireEvent.click(document.querySelector("#nav-bot")!);
+    await eventually(() => !owned("overlay"));
+    assert.equal(top.getAttribute("aria-current"), null);
+
+    fireEvent.click(top);
+    await eventually(() => owned("overlay"));
+    fireEvent.click(document.querySelector("#nav-new")!);
+    await eventually(() => !owned("overlay"));
+
+    // 6. ProseMirror composer WITH internal contenteditable="false" widget supports
+    //    floating command pill (outside [data-codex-composer-root]), fullwidth ／althing,
+    //    and intercepts Enter BEFORE CodexHost's document-capture keydown listener!
+    const composer = document.querySelector("[data-codex-composer-root]")!;
+    const pm = composer.querySelector<HTMLElement>(".ProseMirror")!;
+    pm.innerHTML =
+      '<p>／althing 嵌入桌面兼容测试<span contenteditable="false"></span></p>';
+    fireEvent.input(pm);
+    const pill = await eventually(() =>
+      document.querySelector<HTMLButtonElement>("[data-althing-command]"),
+    );
+    assert.equal(composer.querySelector("[data-althing-command]"), null);
+    assert.match(pill.textContent!, /回车直接召开议会/);
+
+    fireEvent.keyDown(pm, { key: "Enter" });
+    assert.equal(hostDocumentKeydownSawSlash, false);
+    const overlay = await eventually(() => owned("overlay"));
+    await eventually(() =>
+      query(overlay).getByRole("heading", {
+        name: "嵌入桌面兼容测试",
+        level: 1,
+      }),
+    );
+    assert.equal(pm.textContent?.trim(), "");
+    assert.equal(lastConveneParams?.cwd, "/work/the-althing");
+  } finally {
+    document.removeEventListener("keydown", hostKeydownProbe, true);
+    dispose();
+  }
 });

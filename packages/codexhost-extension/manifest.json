@@ -1,7 +1,7 @@
 {
   "manifestVersion": 2,
   "id": "the-althing",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": {
     "en": "The Althing",
     "zh-CN": "议事厅"
@@ -98,13 +98,13 @@
       "default": true
     },
     {
-      "key": "sidebarAlthingVisibility",
+      "key": "sidebarEntryVisibility",
       "type": "select",
       "label": { "en": "Top-level Desktop sidebar entry", "zh-CN": "桌面侧栏顶部议事厅入口" },
-      "default": "active",
+      "default": "always",
       "options": [
+        { "value": "always", "label": { "en": "Always show (below New chat & Bot)", "zh-CN": "始终显示（新聊天和 Bot 下方）" } },
         { "value": "active", "label": { "en": "Only during active councils", "zh-CN": "仅在有议题讨论时显示" } },
-        { "value": "always", "label": { "en": "Always show", "zh-CN": "始终显示" } },
         { "value": "hidden", "label": { "en": "Always hide", "zh-CN": "始终隐藏" } }
       ]
     },

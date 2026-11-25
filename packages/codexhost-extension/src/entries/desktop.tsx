@@ -1,5 +1,17 @@
 import { resolveLocale, translate as localize } from "../shared/i18n";
 import { installCouncilCommand } from "./composer-command";
+import {
+  assignTopicsToProjects,
+  findProjectAnchors,
+  findTopPlacement,
+  isNativeSidebarNavigationClick,
+  mountTargetForProjectAnchor,
+  NAV_RAIL_SELECTOR,
+  normalizeThreadId,
+  ROW_SELECTOR,
+  SIDEBAR_SCROLL_SELECTOR,
+  type SidebarRowLike,
+} from "./sidebar-placement";
 import { mountWorkspace } from "../frontend/App";
 import {
   listenAppearance,
@@ -11,29 +23,28 @@ import {
 } from "../frontend/host";
 import { RpcClient, watchEvents } from "../frontend/rpc-client";
 import type { Card } from "../frontend/types";
-type Row = { element: HTMLElement; threadId: string | null; isLocal: boolean };
+
 type Desktop = HostApi & {
   dom: {
     mount: (
       el: Element,
       parent: Element,
-      position?: "prepend" | "append" | "after",
+      position?: "prepend" | "append" | "before" | "after",
     ) => void;
   };
-  sidebar: { observeRows: (cb: (rows: readonly Row[]) => void) => () => void };
+  sidebar: {
+    observeRows: (cb: (rows: readonly SidebarRowLike[]) => void) => () => void;
+  };
   navigate: { openThread: (id: string) => Promise<void> };
   track: (fn: () => void) => void;
 };
 declare const define: (extension: {
   activate: (api: Desktop) => () => void;
 }) => void;
-const sidebar = "[data-app-action-sidebar-scroll]",
-  rail = "nav[data-app-navigation-rail]",
+
+const sidebar = SIDEBAR_SCROLL_SELECTOR,
+  rail = NAV_RAIL_SELECTOR,
   owned = "[data-althing-owned]";
-const projectSelector =
-  "[data-app-action-sidebar-project-row],[data-project-cwd],[data-project-path],[data-app-action-sidebar-project],[data-app-action-sidebar-project-collapsed],[data-app-action-sidebar-project-id]";
-const rowSelector =
-  "[data-app-action-sidebar-thread-row],[data-app-action-sidebar-thread-id]";
 const foreign = [
   "children",
   "toggle",
@@ -46,17 +57,19 @@ const foreign = [
 ]
   .map((k) => "[data-codexhost-sidebar-tree-" + k + "]")
   .join(",");
+
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, kind: string) {
   const el = document.createElement(tag);
   el.dataset.althingOwned = kind;
   return el;
 }
+
 function icon() {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg"),
     path = document.createElementNS(svg.namespaceURI, "path");
   svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("width", "17");
-  svg.setAttribute("height", "17");
+  svg.setAttribute("width", "16");
+  svg.setAttribute("height", "16");
   svg.setAttribute("aria-hidden", "true");
   path.setAttribute(
     "d",
@@ -66,32 +79,72 @@ function icon() {
   svg.append(path);
   return svg;
 }
+
+function isAlreadyMounted(
+  node: Element,
+  anchor: Element,
+  position: "prepend" | "append" | "before" | "after",
+): boolean {
+  if (position === "after") return anchor.nextElementSibling === node;
+  if (position === "before") return anchor.previousElementSibling === node;
+  if (position === "prepend")
+    return node.parentElement === anchor && anchor.firstElementChild === node;
+  return node.parentElement === anchor;
+}
+
+function resolveTopVisibility(
+  s: Record<string, unknown>,
+): "always" | "active" | "hidden" {
+  if (
+    s.sidebarEntryVisibility === "always" ||
+    s.sidebarEntryVisibility === "active" ||
+    s.sidebarEntryVisibility === "hidden"
+  ) {
+    return s.sidebarEntryVisibility;
+  }
+  // Preserve explicit opt-out from earlier versions while adopting "always" as the new default.
+  if (s.sidebarAlthingVisibility === "hidden") return "hidden";
+  return "always";
+}
+
 function activate(api: Desktop) {
   const ctrl = new AbortController(),
     rpc = new RpcClient(api.backend, ctrl.signal);
-  let topVisibility: "active" | "always" | "hidden" = "active",
+  let topVisibility: "active" | "always" | "hidden" = "always",
     groupsEnabled = true,
     hostLocale = "en",
     preference: unknown = "auto",
-    rows: readonly Row[] = [],
+    rows: readonly SidebarRowLike[] = [],
     cards: Card[] = [],
     projects: Project[] = [],
     threads = new Map<string, string>();
-  const groups = new Map<Element, { box: HTMLElement; signature: string }>(),
+  const groups = new Map<
+      Element,
+      { box: HTMLElement; target: Element; position: "after" | "append"; signature: string }
+    >(),
     expanded = new Map<string, boolean>();
   let overlay: HTMLElement | undefined,
     unmount: (() => void) | undefined,
     resize: ResizeObserver | undefined,
     frame = 0,
     measured: Element[] = [],
-    known: Project[] = [];
+    known: Project[] = [],
+    lastCatalogRefresh = 0;
+
   const top = element("button", "top");
   top.type = "button";
   const topText = document.createElement("span"),
     pill = document.createElement("small");
   top.append(icon(), topText, pill);
+
   const translate = (en: string, zh: string) =>
     localize(resolveLocale(hostLocale, preference), en, zh);
+
+  function syncTopSelected() {
+    if (overlay) top.setAttribute("aria-current", "page");
+    else top.removeAttribute("aria-current");
+  }
+
   function close() {
     resize?.disconnect();
     measured = [];
@@ -100,7 +153,9 @@ function activate(api: Desktop) {
     unmount = undefined;
     overlay?.remove();
     overlay = undefined;
+    syncTopSelected();
   }
+
   function place() {
     if (!overlay) return;
     const scroll = document.querySelector(sidebar),
@@ -126,6 +181,7 @@ function activate(api: Desktop) {
         Math.min(...(bounds.length ? bounds.map((b) => b.top) : [0])),
       ) + "px";
   }
+
   function open(destination: Destination) {
     if (overlay) {
       overlay.dispatchEvent(
@@ -138,6 +194,7 @@ function activate(api: Desktop) {
     if (typeof ResizeObserver !== "undefined")
       resize = new ResizeObserver(place);
     place();
+    syncTopSelected();
     unmount = mountWorkspace(overlay, api, {
       initial: destination,
       projects: () => known,
@@ -148,7 +205,9 @@ function activate(api: Desktop) {
       },
     });
   }
+
   top.onclick = () => open({});
+
   function saved(cwd: string) {
     try {
       return localStorage.getItem("the-althing.project." + cwd) === "open";
@@ -156,37 +215,111 @@ function activate(api: Desktop) {
       return false;
     }
   }
+
+  function refreshHostCatalog(force = false) {
+    const now = Date.now();
+    if (!force && now - lastCatalogRefresh < 4_000) return;
+    lastCatalogRefresh = now;
+    void rpc
+      .call<{ projects: Project[] }>("codexhost/projects")
+      .then((r) => {
+        if (Array.isArray(r.projects)) {
+          projects = r.projects;
+          schedule();
+        }
+      })
+      .catch(() => {});
+    void rpc
+      .call<{
+        threads: { id?: string; threadId?: string; thread?: string; cwd?: string }[];
+      }>("codexhost/threads", { limit: 100 })
+      .then((r) => {
+        let changed = false;
+        for (const t of r.threads ?? []) {
+          if (!t.cwd) continue;
+          const rawId = t.threadId || t.id || t.thread || "";
+          const norm = normalizeThreadId(rawId);
+          if (norm && threads.get(norm) !== t.cwd) {
+            threads.set(norm, t.cwd);
+            changed = true;
+          }
+          if (rawId && threads.get(rawId) !== t.cwd) {
+            threads.set(rawId, t.cwd);
+          }
+        }
+        if (changed) schedule();
+      })
+      .catch(() => {});
+  }
+
+  function applySampledStyle(target: HTMLElement, source: Element | null) {
+    if (!source) return;
+    const style = window.getComputedStyle(source);
+    if (style.fontSize && target.style.fontSize !== style.fontSize) {
+      target.style.fontSize = style.fontSize;
+    }
+  }
+
   function update() {
     frame = 0;
     if (ctrl.signal.aborted) return;
     place();
     const scroll = document.querySelector(sidebar),
-      parent = scroll || document.querySelector(rail);
-    if (!parent) {
+      placement = findTopPlacement(document, owned, foreign);
+    if (!placement) {
       top.remove();
       for (const { box } of groups.values()) box.remove();
       groups.clear();
       return;
     }
+
     const title = translate("The Althing", "议事厅"),
       n = cards.filter(activeCouncil).length;
+    const sampleParent = scroll || placement.anchor.parentElement || placement.anchor;
     const nativeLabel =
-      parent.querySelector("[data-thread-title]") ||
-      parent.querySelector(rowSelector) ||
-      parent.querySelector(
+      sampleParent.querySelector("[data-thread-title]") ||
+      sampleParent.querySelector(ROW_SELECTOR) ||
+      placement.styleSource ||
+      sampleParent.querySelector(
         "[data-app-action-sidebar-project-row],[data-sidebar-destination]",
       );
     const fontSize = nativeLabel
       ? window.getComputedStyle(nativeLabel).fontSize
       : "";
+
     if (topVisibility === "always" || (topVisibility === "active" && n > 0)) {
-      if (top.style.fontSize !== fontSize) top.style.fontSize = fontSize;
-      if (top.parentElement !== parent) api.dom.mount(top, parent, "prepend");
-    } else top.remove();
+      applySampledStyle(top, placement.styleSource || nativeLabel);
+      if (placement.styleSource) {
+        const navStyle = window.getComputedStyle(placement.styleSource);
+        if (
+          navStyle.minHeight &&
+          navStyle.minHeight !== "0px" &&
+          top.style.minHeight !== navStyle.minHeight
+        ) {
+          top.style.minHeight = navStyle.minHeight;
+        }
+        if (
+          navStyle.borderRadius &&
+          navStyle.borderRadius !== "0px" &&
+          top.style.borderRadius !== navStyle.borderRadius
+        ) {
+          top.style.borderRadius = navStyle.borderRadius;
+        }
+      }
+      if (!isAlreadyMounted(top, placement.anchor, placement.position)) {
+        api.dom.mount(top, placement.anchor, placement.position);
+      }
+    } else {
+      top.remove();
+    }
+
     if (topText.textContent !== title) topText.textContent = title;
     if (pill.hidden !== !n) pill.hidden = !n;
-    if (pill.textContent !== String(n)) pill.textContent = String(n);
+    const pillText = n ? String(n) : "";
+    if (pill.textContent !== pillText) pill.textContent = pillText;
     pill.title = translate("Active councils", "活跃议题");
+    syncTopSelected();
+
     const catalog = new Map<string, Project>();
     for (const c of cards)
       if (c.projectCwd)
@@ -195,108 +328,31 @@ function activate(api: Desktop) {
           name: c.projectLabel || c.projectCwd.split(/[\\/]/).pop()!,
         });
     for (const p of projects) catalog.set(workspaceKey(p.cwd), p);
-    const candidates = new Map<Element, Project>();
-    function match(node: Element, cwd?: string) {
-      if (
-        candidates.has(node) ||
-        node.closest(owned + "," + foreign) ||
-        node.matches(rowSelector)
-      )
-        return;
-      const path =
-        cwd ||
-        [
-          "data-project-cwd",
-          "data-project-path",
-          "data-app-action-sidebar-project-id",
-          "data-app-action-sidebar-project-path",
-          "data-cwd",
-          "title",
-          "data-app-action-sidebar-project",
-        ]
-          .map((a) => node.getAttribute(a))
-          .find((v) => v && /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(v));
-      const label =
-        node.getAttribute("data-app-action-sidebar-project-label") ||
-        node.getAttribute("data-project-label") ||
-        node.getAttribute("aria-label") ||
-        node.querySelector("[data-project-label]")?.textContent ||
-        Array.from(node.childNodes)
-          .map((n) => (n.nodeType === 3 ? n.textContent : ""))
-          .join("")
-          .trim() ||
-        node.firstElementChild?.textContent?.trim();
-      const byName = [...catalog.values()].filter(
-        (p) => p.name === label || p.cwd === label,
-      );
-      const p = path
-        ? catalog.get(workspaceKey(path)) || {
-            cwd: path,
-            name: label || path.split(/[\\/]/).pop() || path,
-          }
-        : byName.length === 1
-          ? byName[0]
-          : undefined;
-      if (p) {
-        candidates.set(node, p);
-        catalog.set(workspaceKey(p.cwd), p);
-      }
-    }
-    if (scroll) {
-      scroll.querySelectorAll(projectSelector).forEach((el) => {
-        if (!el.parentElement?.closest(projectSelector)) match(el);
-      });
-      for (const r of rows) {
-        const cwd = r.threadId && threads.get(r.threadId);
-        if (
-          !r.isLocal ||
-          !cwd ||
-          !scroll.contains(r.element) ||
-          [...candidates.keys()].some((e) => e.contains(r.element))
-        )
-          continue;
-        const container = r.element.closest(
-          "[data-app-action-sidebar-project-collapsed]",
-        );
-        if (container && scroll.contains(container)) {
-          match(container, cwd);
-          continue;
-        }
-        const listId = r.element
-          .closest("[data-app-action-sidebar-project-list-id]")
-          ?.getAttribute("data-app-action-sidebar-project-list-id");
-        const header =
-          (listId &&
-            Array.from(
-              scroll.querySelectorAll("[data-app-action-sidebar-project-row]"),
-            ).find(
-              (e) =>
-                e.getAttribute("data-app-action-sidebar-project-id") === listId,
-            )) ||
-          r.element.closest('[role="listitem"]')?.parentElement
-            ?.previousElementSibling;
-        if (header && !header.querySelector(rowSelector)) match(header, cwd);
-      }
-      scroll
-        .querySelectorAll(
-          "button[aria-expanded],[data-app-action-sidebar-section] > header",
-        )
-        .forEach((e) => {
-          if (
-            !e.closest(projectSelector) &&
-            ![...candidates.keys()].some((c) => c.contains(e))
-          )
-            match(e);
-        });
-    }
+
+    const candidates = scroll
+      ? findProjectAnchors(scroll, rows, threads, catalog, owned, foreign)
+      : new Map<Element, Project>();
+
     known = [...catalog.values()];
+
+    const matchedProjects: Project[] = [];
+    const seenMatched = new Set<string>();
+    for (const p of candidates.values()) {
+      const k = workspaceKey(p.cwd);
+      if (!seenMatched.has(k)) {
+        seenMatched.add(k);
+        matchedProjects.push(p);
+      }
+    }
+    const topicsByProject = assignTopicsToProjects(cards, matchedProjects);
+
     const visible = new Set<Element>(),
       seen = new Set<string>();
     for (const [anchor, p] of candidates) {
       if (!groupsEnabled) break;
       const key = workspaceKey(p.cwd);
       if (seen.has(key)) continue;
-      const topics = cards.filter((c) => workspaceKey(c.projectCwd) === key);
+      const topics = topicsByProject.get(key) ?? [];
       if (!topics.length) continue;
       seen.add(key);
       visible.add(anchor);
@@ -313,26 +369,30 @@ function activate(api: Desktop) {
           c.status,
         ]),
       ]);
+      const mountSpec = mountTargetForProjectAnchor(anchor, ROW_SELECTOR);
       let g = groups.get(anchor);
-      if (!g?.box.isConnected) {
-        const box = element("div", "group");
-        api.dom.mount(
+      if (
+        !g?.box.isConnected ||
+        g.target !== mountSpec.target ||
+        g.position !== mountSpec.position ||
+        !isAlreadyMounted(g.box, mountSpec.target, mountSpec.position)
+      ) {
+        const box = g?.box ?? element("div", "group");
+        api.dom.mount(box, mountSpec.target, mountSpec.position);
+        g = {
           box,
-          anchor,
-          !anchor.querySelector(rowSelector) &&
-            anchor.matches(
-              'button,[role="button"],header,[data-app-action-sidebar-project-collapsed]',
-            )
-            ? "after"
-            : "append",
-        );
-        g = { box, signature: "" };
+          target: mountSpec.target,
+          position: mountSpec.position,
+          signature: g?.signature ?? "",
+        };
         groups.set(anchor, g);
       }
-      if (g.box.style.fontSize !== fontSize) g.box.style.fontSize = fontSize;
+      if (fontSize && g.box.style.fontSize !== fontSize)
+        g.box.style.fontSize = fontSize;
       if (g.signature === signature) continue;
       g.signature = signature;
       const header = element("button", "group-header");
+      header.type = "button";
       header.setAttribute("aria-expanded", String(isOpen));
       header.append(
         icon(),
@@ -352,6 +412,7 @@ function activate(api: Desktop) {
       if (isOpen) {
         for (const c of topics) {
           const b = element("button", "topic");
+          b.type = "button";
           b.textContent =
             (activeCouncil(c) ? "● " : "") +
             c.title +
@@ -362,6 +423,7 @@ function activate(api: Desktop) {
           g.box.append(b);
         }
         const create = element("button", "new");
+        create.type = "button";
         create.textContent = "+ " + translate("New Council", "新建议题");
         create.onclick = () => open({ newCouncil: true, projectCwd: p.cwd });
         g.box.append(create);
@@ -374,16 +436,19 @@ function activate(api: Desktop) {
       }
     }
   }
+
   function schedule() {
     if (!ctrl.signal.aborted && !frame) frame = requestAnimationFrame(update);
   }
+
+  const sidebarRegion = "aside," + sidebar + "," + rail;
   const mutations = new MutationObserver((changes) => {
     if (
       changes.some((c) => {
         const target = c.target as Element;
         if (target.closest?.(owned)) return false;
         const changed = [...c.addedNodes, ...c.removedNodes];
-        if (target.closest?.(sidebar + "," + rail))
+        if (target.closest?.(sidebarRegion))
           return (
             c.type === "attributes" ||
             changed.some((n) => !(n instanceof Element && n.matches(owned)))
@@ -391,8 +456,7 @@ function activate(api: Desktop) {
         return changed.some(
           (n) =>
             n instanceof Element &&
-            (n.matches(sidebar + "," + rail) ||
-              n.querySelector(sidebar + "," + rail)),
+            (n.matches(sidebarRegion) || n.querySelector(sidebarRegion)),
         );
       })
     )
@@ -408,18 +472,32 @@ function activate(api: Desktop) {
       "data-app-action-sidebar-project-label",
       "data-app-action-sidebar-project-collapsed",
       "data-app-action-sidebar-section-collapsed",
+      "aria-expanded",
     ],
   });
+
   function activeProjectCwd() {
+    // Codex Desktop marks the open conversation right above its composer.
+    const aboveComposer = document
+      .querySelector("[data-above-composer-conversation-id]")
+      ?.getAttribute("data-above-composer-conversation-id");
+    if (aboveComposer) {
+      const cwd =
+        threads.get(normalizeThreadId(aboveComposer)) ||
+        threads.get(aboveComposer);
+      if (cwd) return cwd;
+    }
+
     const activeSelector =
-      '[aria-current],[aria-selected="true"],[data-active="true"],[data-selected="true"]';
+      '[data-app-action-sidebar-thread-active],[data-app-action-sidebar-thread-selected],[aria-current],[aria-selected="true"],[data-active="true"],[data-selected="true"]';
     for (const r of rows) {
       if (!r.threadId) continue;
       if (
         r.element.matches(activeSelector) ||
         r.element.querySelector(activeSelector)
       ) {
-        const cwd = threads.get(r.threadId);
+        const cwd =
+          threads.get(normalizeThreadId(r.threadId)) || threads.get(r.threadId);
         if (cwd) return cwd;
       }
     }
@@ -432,6 +510,7 @@ function activate(api: Desktop) {
     if (attrCwd) return attrCwd;
     return known.length === 1 ? known[0].cwd : undefined;
   }
+
   const offCommand = installCouncilCommand(
     (cmd) => {
       const projectCwd = activeProjectCwd();
@@ -457,26 +536,33 @@ function activate(api: Desktop) {
       instant
         ? translate("Press Enter to convene council", "回车直接召开议会")
         : translate("Start a council", "发起会议"),
+    {
+      mount: (node) => api.dom.mount(node, document.body, "append"),
+    },
   );
+
   const offRows = api.sidebar.observeRows((r) => {
     rows = r;
+    const hasUnknown = r.some((row) => {
+      const id = normalizeThreadId(row.threadId);
+      return row.isLocal && id && !threads.has(id);
+    });
+    if (hasUnknown) refreshHostCatalog();
     schedule();
   });
+
   const offAppearance = listenAppearance(api, document, (loc) => {
     hostLocale = loc;
     offCommand.refreshLabel();
     schedule();
   });
+
   let settingsChanged = false;
   const settings = (s: Record<string, unknown>) => {
     preference = s.language;
     offCommand.refreshLabel();
     groupsEnabled = s.showProjectAlthingItems !== false;
-    topVisibility =
-      s.sidebarAlthingVisibility === "always" ||
-      s.sidebarAlthingVisibility === "hidden"
-        ? s.sidebarAlthingVisibility
-        : "active";
+    topVisibility = resolveTopVisibility(s);
     schedule();
   };
   const offSettings = api.storage.onChange((s) => {
@@ -489,6 +575,7 @@ function activate(api: Desktop) {
       if (!settingsChanged) settings(s);
     })
     .catch(() => {});
+
   let revision = 0;
   function sync() {
     const request = ++revision;
@@ -502,24 +589,9 @@ function activate(api: Desktop) {
       })
       .catch(() => {});
   }
-  void rpc
-    .call<{ projects: Project[] }>("codexhost/projects")
-    .then((r) => {
-      projects = r.projects;
-      schedule();
-    })
-    .catch(() => {});
-  void rpc
-    .call<{ threads: { id?: string; threadId?: string; cwd?: string }[] }>(
-      "codexhost/threads",
-      { limit: 100 },
-    )
-    .then((r) => {
-      for (const t of r.threads)
-        if (t.cwd) threads.set(t.threadId || t.id || "", t.cwd);
-      schedule();
-    })
-    .catch(() => {});
+
+  refreshHostCatalog(true);
+
   function native(event: Event) {
     if (!overlay) return;
     const path = event
@@ -527,31 +599,22 @@ function activate(api: Desktop) {
       .filter((el): el is Element => el instanceof Element);
     if (path.some((el) => el.matches(owned))) return;
     if (
-      path.some(
-        (el) =>
-          el.matches(
-            rowSelector +
-              ",[data-sidebar-destination],[data-app-action-new-thread],[data-app-action-sidebar-new-thread],[data-app-action-sidebar-project-create],[data-codexhost-settings-trigger],[data-codexhost-settings-shell]",
-          ) ||
-          rows.some((r) => r.element === el) ||
-          (el.matches("button,a,[role=button]") &&
-            /^(?:new (?:thread|chat)|新建(?:对话|会话)|新话题)$/i.test(
-              (
-                el.getAttribute("aria-label") ||
-                el.getAttribute("title") ||
-                el.textContent ||
-                ""
-              ).trim(),
-            )),
+      path.some((el) =>
+        isNativeSidebarNavigationClick(el, rows, owned, foreign),
       )
     )
       close();
   }
+
   window.addEventListener("resize", place);
   document.addEventListener("click", native, true);
   sync();
-  watchEvents(rpc, document, ctrl.signal, sync);
+  watchEvents(rpc, document, ctrl.signal, () => {
+    sync();
+    refreshHostCatalog();
+  });
   schedule();
+
   function dispose() {
     if (ctrl.signal.aborted) return;
     ctrl.abort();
@@ -573,4 +636,5 @@ function activate(api: Desktop) {
   api.signal.addEventListener("abort", dispose, { once: true });
   return dispose;
 }
+
 define({ activate });

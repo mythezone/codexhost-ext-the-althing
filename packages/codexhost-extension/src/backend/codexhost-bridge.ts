@@ -162,7 +162,7 @@ export class CodexHostBridge {
   private async post<T>(
     route: string,
     params: object,
-    deadline = AbortSignal.timeout(5500),
+    deadline = AbortSignal.timeout(12_000),
   ): Promise<T> {
     const signal = AbortSignal.any([deadline, this.stop.signal]);
     for (let attempt = 0; ; attempt++) {
@@ -320,14 +320,18 @@ export class CodexHostBridge {
     return this.post<{ harnesses: unknown[] }>("harness/list", {});
   }
   inspectHarness(harnessId: string, cwd?: string, refresh = false) {
-    return this.post<Inspection>("harness/inspect", {
-      harnessId,
-      cwd,
-      refresh,
-    });
+    return this.post<Inspection>(
+      "harness/inspect",
+      {
+        harnessId,
+        cwd,
+        refresh,
+      },
+      AbortSignal.timeout(10_000),
+    );
   }
   async delegateStart({ harness, cwd, model, thinking, ...rest }: Start) {
-    const deadline = AbortSignal.timeout(5500);
+    const deadline = AbortSignal.timeout(30_000);
     let ref = typeof model === "string" ? { id: model } : model;
     if (typeof model === "string") {
       const suffix = /~(fast|ultrafast)$/.exec(model);
@@ -394,12 +398,16 @@ export class CodexHostBridge {
       watchTimeoutMs?: number;
     } = {},
   ) {
-    return this.post<{ threadId: string; turnId?: string }>("thread/send", {
-      threadId,
-      message,
-      watch: true,
-      ...opts,
-    });
+    return this.post<{ threadId: string; turnId?: string }>(
+      "thread/send",
+      {
+        threadId,
+        message,
+        watch: true,
+        ...opts,
+      },
+      AbortSignal.timeout(30_000),
+    );
   }
   cancelThread(threadId: string) {
     return this.post<Record<string, unknown>>("thread/cancel", { threadId });

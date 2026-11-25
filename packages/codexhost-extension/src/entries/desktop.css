@@ -4,36 +4,56 @@
   bottom: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  background: var(--color-token-bg-primary, #fff);
+  background: var(--color-background-default, var(--color-token-bg-primary, light-dark(#fff, #202020)));
   z-index: 100;
+  -webkit-app-region: no-drag;
 }
 button[data-althing-owned] {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   width: 100%;
-  min-height: 29px;
-  color: var(--color-token-text-primary, inherit);
+  min-height: 30px;
+  color: var(--color-text-primary, var(--color-token-text-primary, inherit));
   background: transparent;
   border: 0;
-  border-radius: 6px;
-  padding: 4px 9px;
+  border-radius: 8px;
+  padding: 5px 10px;
   font: inherit;
   text-align: start;
   cursor: pointer;
+  box-sizing: border-box;
+  -webkit-app-region: no-drag;
 }
-button[data-althing-owned]:hover {
-  background: var(--color-token-list-hover, rgba(128, 128, 128, 0.14));
+button[data-althing-owned] > svg {
+  flex: none;
+}
+button[data-althing-owned="top"] > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+button[data-althing-owned]:hover,
+button[data-althing-owned="top"][aria-current="page"] {
+  background: var(
+    --color-background-secondary-ghost-hover,
+    var(--color-token-list-hover, rgba(128, 128, 128, 0.14))
+  );
 }
 button[data-althing-owned="top"],
 [data-althing-owned="group"] {
   font-size: var(--text-sm, 13px);
 }
 [data-althing-owned="top"] small:not([hidden]) {
+  flex: none;
   border-radius: 10px;
   padding: 1px 6px;
   background: #32825d;
   color: white;
+  font-size: 11px;
+  line-height: 1.4;
   animation: althing-active 2s ease-in-out infinite;
 }
 [data-althing-owned="group"] {
@@ -42,6 +62,9 @@ button[data-althing-owned="top"],
 [data-althing-owned="group"] button[data-althing-owned="topic"],
 [data-althing-owned="group"] button[data-althing-owned="new"] {
   padding-inline-start: 27px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 @keyframes althing-active {
   50% {
